@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alfa_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: alfa_analytics
+      POSTGRES_USER: alfa_user
+      POSTGRES_PASSWORD: alfa_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alfa_user -d alfa_analytics"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: alfa_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: alfa_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://alfa_user:alfa_password@postgres:5432/alfa_analytics
+      - REDIS_URL=redis://redis:6379/0
+      - USE_IN_MEMORY_BUS=false
+      - HOST=0.0.0.0
+      - PORT=8000
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
