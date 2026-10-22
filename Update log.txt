@@ -1,0 +1,41 @@
+Инициализация и Middleware (backend/app/main.py):
+
+Настроен FastAPI с CORS (settings.CORS_ORIGINS).
+Добавлен middleware аудита: замер latency, логирование статусов и фиксация роли пользователя (X-User-Role).
+Настроен автоматический lifespan: инициализация схемы БД при запуске.
+Swagger / OpenAPI UI доступен на /docs.
+
+Все API-роуты (backend/app/api/):
+
+companies.py: GET /companies (список компаний > 15 млрд ₽), GET /companies/{id} (детальный профиль), GET /companies/{id}/counterparties (граф топ-поставщиков и покупателей).
+feed.py: GET /feed/{company_id} — персонализированная лента с бустингом релевантности по коду ОКВЭД и макроэкономике.
+insights.py: POST /insights (создание задачи, проверка кэша/идемпотентности), GET /insights/{id} (выдача инсайта с первоисточниками), GET /insights/company/{company_id}.
+questions.py: POST /questions — интерактивный Q&A по инсайту с адаптацией ответа под конкретную C-level роль (Критерий 10).
+analytics.py: GET /analytics — получение аналитических отчетов Центра макроэкономических исследований Альфа-Банка (Бонд Бриф, ключевая ставка и др.).
+metrics.py: мониторинг здоровья системы (/metrics/system), счетчик расхода токенов и дневного бюджета 500 ₽ (/metrics/budget), метрики качества агента по критерию 08 (/metrics/agent-quality), журнал вызовов инструментов (/metrics/audit).
+streams.py: Server-Sent Events (SSE) эндпоинт GET /streams/{job_id} для живой трансляции рассуждений агента на фронт + GET /streams/{job_id}/history для статической истории.
+router.py: централизованное подключение всех роутов с префиксом /api/v1.
+
+Ядро, безопасность и аудит (backend/app/core/):
+
+config.py: типизированный конфиг на Pydantic Settings с поддержкой .env.
+security.py: ролевая модель RBAC (CEO, CFO, TREASURY, ACCOUNTANT, ANALYST), маскирование персональных данных (телефоны, почты, счета) и сокрытие точных финансовых оборотов для непривилегированных ролей.
+logging.py: структурированное логирование.
+audit.py: ToolAuditManager — аудит обращений агента к инструментам, вайтлистинг безопасных read-only функций и защита от небезопасных действий (Слайд 12, Ограничение 06).
+bus.py: шина событий (поддержка in-memory очередей и Redis Pub/Sub).
+
+Модели SQLAlchemy 2.0 (backend/app/db/):
+
+models/company.py: профили клиентов крупного бизнеса по спецификации df_Uid_data_hack.csv.
+models/transaction.py: платежи и взаимосвязи по спецификации df_Fid_Uid_link_hack.csv.
+models/news.py: внешние новости и публикации аналитики Альфа-Банка.
+models/insight.py: инсайты с 6 обязательными блоками ответов Альфа-Банка + банковские продукты + связь с Evidence.
+models/agent_trace.py: таблицы JobRecord и AgentTraceStep для хранения хода рассуждений агента.
+session.py: асинхронный движок (работает «из коробки» на SQLite для тестов, на Postgres в проде).
+
+DevOps & Контейнеризация (deploy/ и корень):
+
+deploy/Dockerfile: multi-stage сборка на базе python:3.12-slim.
+deploy/nginx.conf: reverse-proxy с обязательным отключением буферизации для SSE (proxy_buffering off;).
+deploy/init-pgvector.sql: SQL-скрипт инициализации расширения CREATE EXTENSION IF NOT EXISTS vector;.
+docker-compose.yml: оркестрация 4 контейнеров (backend, postgres с pgvector, redis, nginx).
