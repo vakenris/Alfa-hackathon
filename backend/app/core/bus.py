@@ -2,7 +2,6 @@ import asyncio
 import json
 from typing import AsyncGenerator, Dict, Set
 from backend.app.core.config import settings
-from backend.app.core.logging import logger
 
 try:
     import redis.asyncio as aioredis
@@ -67,7 +66,6 @@ class RedisEventBus:
             await pubsub.close()
 
 
-# Singleton bus
 in_memory_bus = InMemoryEventBus()
 
 

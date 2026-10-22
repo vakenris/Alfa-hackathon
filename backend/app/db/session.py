@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from backend.app.core.config import settings
 from backend.app.db.base import Base
 
-# Engine configuration
 engine_kwargs = {}
 if "sqlite" in settings.DATABASE_URL:
     engine_kwargs["connect_args"] = {"check_same_thread": False}
@@ -24,13 +23,15 @@ async_session_factory = async_sessionmaker(
 
 
 async def init_db():
-    """Create tables if they do not exist."""
+    """Create all database tables."""
+    # Import all models to ensure they are registered with Base.metadata
+    import backend.app.db.models  # noqa
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency yielding database session."""
+    """FastAPI dependency yielding an async database session."""
     async with async_session_factory() as session:
         try:
             yield session

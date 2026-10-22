@@ -40,7 +40,7 @@ class CompanyResponse(CompanyBase):
 class CounterpartyItem(BaseModel):
     synthetic_u: str
     name: Optional[str] = None
-    direction: str  # "PAYER" (customer) or "BENEFICIARY" (supplier)
+    direction: str  # "CUSTOMER" or "SUPPLIER"
     total_amount: float
     transaction_count: int
 

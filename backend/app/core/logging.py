@@ -11,4 +11,4 @@ def setup_logging():
         ]
     )
 
-logger = logging.getLogger("alfa_backend")
+logger = logging.getLogger("alfa_core")

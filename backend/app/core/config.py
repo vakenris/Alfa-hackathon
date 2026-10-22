@@ -1,4 +1,3 @@
-import os
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,14 +22,17 @@ class Settings(BaseSettings):
     ]
 
     # Database
-    # Default to sqlite+aiosqlite for instant local run, overridden by .env for Postgres
     DATABASE_URL: str = "sqlite+aiosqlite:///./alfa_analytics.db"
 
     # Redis (for Pub/Sub and Queue)
     REDIS_URL: str = "redis://localhost:6379/0"
-    USE_IN_MEMORY_BUS: bool = True  # Fallback when Redis is not available locally
+    USE_IN_MEMORY_BUS: bool = True
 
-    # LLM Settings & Budget Guardian
+    # Security & RBAC
+    SECRET_KEY: str = "alfa-hackathon-secret-key-2026"
+    ALGORITHM: str = "HS256"
+
+    # LLM Settings & Budget Guardian (500 RUB limit)
     LLM_API_BASE_URL: str = "https://api.example.com/v1"
     LLM_API_KEY: str = "mock-key"
     LLM_MAX_DAILY_BUDGET_RUB: float = 500.0
