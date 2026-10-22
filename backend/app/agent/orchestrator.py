@@ -15,7 +15,7 @@ from .context import RunContext
 from .llm import FakeLLMClient, LLMClientProtocol
 from .models import (
     ACTION_ADAPTER, BANK_VIEW_UNAVAILABLE, AgentContextError, AgentEvidenceError,
-    AgentLLMError, AgentResponseError, AgentTimeoutError, FinalAction, ToolObservation,
+    AgentLLMError, AgentLLMTimeoutError, AgentResponseError, AgentTimeoutError, FinalAction, ToolObservation,
 )
 from .prompts import build_finalization_prompt, build_planning_prompt
 from .tools import AnalyticsSourceProtocol, MockAnalyticsSource, execute_tool, validate_arguments
@@ -39,9 +39,11 @@ class AgentInsightEngine:
         counterparties: List[CounterpartyItem], tracer: AgentTracerProtocol,
     ) -> MLInsightResult:
         try:
-            async with asyncio.timeout(self.config.run_timeout_seconds):
+            async with asyncio.timeout(self.config.run_timeout_seconds) as deadline:
                 return await self._run(company, event, counterparties, tracer)
         except TimeoutError:
+            if not deadline.expired():
+                raise
             await tracer.emit_step("Ошибка времени", "Превышен общий timeout запуска агента.")
             raise AgentTimeoutError("Превышен общий timeout запуска агента.") from None
 
@@ -77,11 +79,14 @@ class AgentInsightEngine:
                 )
             await tracer.emit_step("Вызов клиента", f"Вызов LLM {call_index + 1}/{call_budget}.")
             try:
-                async with asyncio.timeout(self.config.llm_timeout_seconds):
+                async with asyncio.timeout(self.config.llm_timeout_seconds) as deadline:
                     response = await self.llm_client.generate(prompt)
             except TimeoutError:
+                if not deadline.expired():
+                    await tracer.emit_step("Ошибка LLM", "LLM-клиент завершился ошибкой; повторов нет.")
+                    raise AgentLLMError("LLM-клиент завершился ошибкой; повторов нет.") from None
                 await tracer.emit_step("Ошибка LLM", "Превышен timeout вызова LLM.")
-                raise AgentLLMError("Превышен timeout вызова LLM.") from None
+                raise AgentLLMTimeoutError("Превышен timeout вызова LLM.") from None
             except Exception:
                 await tracer.emit_step("Ошибка LLM", "LLM-клиент завершился ошибкой; повторов нет.")
                 raise AgentLLMError("LLM-клиент завершился ошибкой; повторов нет.") from None

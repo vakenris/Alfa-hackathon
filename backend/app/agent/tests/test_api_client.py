@@ -236,7 +236,11 @@ class ChatCompletionsClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("test-secret", str(caught.exception))
 
     async def test_http_timeouts_are_reported_without_retry(self):
-        for error_type in (httpx.ConnectTimeout, httpx.ReadTimeout):
+        for error_type, kind in (
+            (httpx.ConnectTimeout, "http_connect"), (httpx.ReadTimeout, "http_read"),
+            (httpx.WriteTimeout, "http_write"), (httpx.PoolTimeout, "http_pool"),
+            (httpx.TimeoutException, "http_timeout"),
+        ):
             with self.subTest(error_type=error_type):
                 self.requests.clear()
 
@@ -247,6 +251,7 @@ class ChatCompletionsClientTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(LLMTimeoutError) as caught:
                     await client.generate("test")
                 self.assertEqual(len(self.requests), 1)
+                self.assertEqual(caught.exception.timeout_kind, kind)
                 self.assertNotIn("test-secret", str(caught.exception))
 
     async def test_total_deadline_is_enforced(self):
@@ -259,8 +264,9 @@ class ChatCompletionsClientTests(unittest.IsolatedAsyncioTestCase):
             ChatCompletionsConfig(**{**self.config_values, "timeout_seconds": 0.01}),
             transport=httpx.MockTransport(slow_response),
         )
-        with self.assertRaises(LLMTimeoutError):
+        with self.assertRaises(LLMTimeoutError) as caught:
             await client.generate("test")
+        self.assertEqual(caught.exception.timeout_kind, "http_deadline")
         self.assertEqual(len(self.requests), 1)
 
     async def test_non_json_http_response_is_rejected(self):
@@ -302,6 +308,40 @@ class ChatCompletionsClientTests(unittest.IsolatedAsyncioTestCase):
             await client.generate("test")
         self.assertEqual(client.last_usage, usage)
         self.assertEqual(len(self.requests), 1)
+
+    async def test_truncation_keeps_safe_metadata_for_empty_partial_and_complete_content(self):
+        for content in (None, "", '{"incomplete":', '{"ok":true}'):
+            with self.subTest(content=content):
+                self.requests.clear()
+                client = self.make_client(lambda request: httpx.Response(
+                    200, json=completion(content=content, finish_reason="length"),
+                ))
+                with self.assertRaises(LLMOutputLimitError):
+                    await client.generate("Test prompt")
+                self.assertEqual(client.last_finish_reason, "length")
+                self.assertEqual(client.last_content_chars, None if content is None else len(content))
+                self.assertEqual(len(self.requests), 1)
+
+    async def test_response_metadata_is_reset_before_http_or_transport_failure(self):
+        for failed in (httpx.Response(401), httpx.ConnectError("PRIVATE ERROR")):
+            with self.subTest(error=type(failed).__name__):
+                replies = [httpx.Response(200, json=completion()), failed]
+                def handler(request):
+                    reply = replies.pop(0)
+                    if isinstance(reply, Exception):
+                        raise reply
+                    return reply
+                client = self.make_client(handler)
+                self.assertIsNone(client.last_finish_reason)
+                self.assertIsNone(client.last_content_chars)
+                await client.generate("First prompt")
+                self.assertEqual(client.last_finish_reason, "stop")
+                self.assertEqual(client.last_content_chars, len('{"ok": true}'))
+                with self.assertRaises((LLMHTTPError, LLMTransportError)):
+                    await client.generate("Second prompt")
+                self.assertIsNone(client.last_finish_reason)
+                self.assertIsNone(client.last_content_chars)
+                self.assertIsNone(client.last_usage)
 
     async def test_api_client_works_with_existing_engine_contract(self):
         response_json = FakeLLMClient().response_json

@@ -31,6 +31,10 @@ class AgentLLMError(AgentError):
     pass
 
 
+class AgentLLMTimeoutError(AgentLLMError):
+    """The orchestrator's own per-call deadline expired, not an API failure."""
+
+
 class AgentTimeoutError(AgentError):
     pass
 

@@ -36,6 +36,20 @@ RULES = (
 )
 
 
+# Opt-in instruction for constrained checks. Ordinary engine prompts do not use it.
+COMPACT_FINALIZATION_RULES = (
+    "Компактный проверочный формат: сохрани все восемь полей MLInsightResult: "
+    "what_happened, why_important, consequences, bank_view, ai_view, "
+    "recommended_action, relevant_bank_product, evidences. "
+    "В каждом из шести текстовых полей — одно короткое предложение, "
+    "ориентир до 120 символов; обязательную цитату сохрани целиком, даже если она длиннее. "
+    "Не добавляй вступление, пояснения вне JSON, списки или повторный пересказ "
+    "одних выводов в нескольких полях. Не выводи схему. "
+    "Верни один JSON-объект в одну строку, без отступов; "
+    "русский текст пиши обычными символами, без Unicode escape-последовательностей.\n"
+)
+
+
 def build_planning_prompt(context: RunContext, *, steps_remaining: int, tools_remaining: int) -> str:
     return (
         RULES
