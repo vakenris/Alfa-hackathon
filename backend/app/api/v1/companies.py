@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.api.deps import get_db, get_current_user_role, UserRole
 from backend.app.services.company_service import CompanyService
 from backend.app.schemas.company import CompanyResponse, CounterpartyGraphResponse
+from backend.app.core.security import mask_financial_amount
 
 router = APIRouter(prefix="/companies", tags=["Companies"])
 
@@ -15,9 +16,15 @@ async def list_companies(
     db: AsyncSession = Depends(get_db),
     role: UserRole = Depends(get_current_user_role)
 ):
-    """Retrieve list of corporate companies."""
+    """Retrieve list of corporate companies with RBAC financial masking."""
     service = CompanyService(db)
-    return await service.list_companies(limit=limit, offset=offset)
+    companies = await service.list_companies(limit=limit, offset=offset)
+    res = []
+    for comp in companies:
+        cr = CompanyResponse.model_validate(comp)
+        cr.revenue_company = mask_financial_amount(cr.revenue_company, role)
+        res.append(cr)
+    return res
 
 
 @router.get("/{company_id}", response_model=CompanyResponse)
@@ -31,7 +38,9 @@ async def get_company_profile(
     company = await service.get_company(company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    return company
+    resp = CompanyResponse.model_validate(company)
+    resp.revenue_company = mask_financial_amount(resp.revenue_company, role)
+    return resp
 
 
 @router.get("/{company_id}/counterparties", response_model=CounterpartyGraphResponse)

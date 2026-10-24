@@ -2,7 +2,7 @@ from typing import Optional, List
 from sqlalchemy import select, desc
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.app.db.models.job import JobRecord, JobTraceStep
+from backend.app.db.models.agent_trace import JobRecord, AgentTraceStep
 
 
 class JobRepository:
@@ -38,8 +38,8 @@ class JobRepository:
                 job.error_message = error_message
             await self.session.commit()
 
-    async def add_trace_step(self, job_id: str, step_number: int, step_name: str, description: str) -> JobTraceStep:
-        step = JobTraceStep(
+    async def add_trace_step(self, job_id: str, step_number: int, step_name: str, description: str) -> AgentTraceStep:
+        step = AgentTraceStep(
             job_id=job_id,
             step_number=step_number,
             step_name=step_name,

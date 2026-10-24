@@ -21,6 +21,18 @@ async def get_company_feed(
     return await service.get_company_feed(company_id=company_id, limit=limit)
 
 
+@router.get("/feed/{company_id}", response_model=FeedResponse, include_in_schema=False)
+async def get_feed_alias(
+    company_id: int,
+    limit: int = Query(default=50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    role: UserRole = Depends(get_current_user_role)
+):
+    """Alias for /companies/{company_id}/feed."""
+    service = FeedService(db)
+    return await service.get_company_feed(company_id=company_id, limit=limit)
+
+
 @router.get("/analytics/bank", response_model=List[NewsArticleResponse])
 async def get_bank_analytics(
     limit: int = Query(default=20, ge=1, le=50),
@@ -28,6 +40,18 @@ async def get_bank_analytics(
     role: UserRole = Depends(get_current_user_role)
 ):
     """Get research and macroeconomic publications from Alfa-Bank."""
+    repo = NewsRepository(db)
+    articles = await repo.list_bank_analytics(limit=limit)
+    return [NewsArticleResponse.model_validate(a) for a in articles]
+
+
+@router.get("/analytics", response_model=List[NewsArticleResponse], include_in_schema=False)
+async def get_analytics_alias(
+    limit: int = Query(default=20, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    role: UserRole = Depends(get_current_user_role)
+):
+    """Alias for /analytics/bank."""
     repo = NewsRepository(db)
     articles = await repo.list_bank_analytics(limit=limit)
     return [NewsArticleResponse.model_validate(a) for a in articles]

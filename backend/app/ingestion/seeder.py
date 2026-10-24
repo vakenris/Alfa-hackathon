@@ -4,8 +4,11 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.logging import logger
-from backend.app.db.models.company import Company, CounterpartyTransaction
+from backend.app.db.models.company import Company
+from backend.app.db.models.transaction import CounterpartyTransaction
 from backend.app.db.models.news import NewsArticle
+from backend.app.db.models.agent_trace import JobRecord, AgentTraceStep
+from backend.app.db.models.insight import Insight, Evidence
 
 SAMPLE_COMPANIES = [
     {
@@ -167,6 +170,49 @@ async def seed_data(session: AsyncSession):
         logger.info("Seeding sample news articles and bank analytics...")
         for item in SAMPLE_NEWS_AND_ANALYTICS:
             session.add(NewsArticle(**item))
+        await session.commit()
+
+    # 4. Seed sample Job & Insight (event_id=999) for initial verification and testing
+    existing_job = await session.execute(select(JobRecord).where(JobRecord.id == "test-job-uuid"))
+    if not existing_job.scalars().first():
+        logger.info("Seeding sample test job and trace steps...")
+        job = JobRecord(
+            id="test-job-uuid",
+            company_id=1,
+            event_id=999,
+            status="SUCCESS"
+        )
+        session.add(job)
+
+        step = AgentTraceStep(
+            job_id="test-job-uuid",
+            step_number=1,
+            step_name="Анализ профиля",
+            description="Профиль загружен"
+        )
+        session.add(step)
+
+        ins = Insight(
+            id=1,
+            job_id="test-job-uuid",
+            company_id=1,
+            event_id=999,
+            what_happened="ЦБ сохранил ставку на уровне 14%",
+            why_important="Влияет на обслуживание кредитного портфеля",
+            consequences="Рост стоимости заимствований",
+            bank_view="Контролировать ликвидность",
+            ai_view="Оптимизировать оборотный капитал",
+            recommended_action="Провести совет казначейства",
+            relevant_bank_product="Факторинг"
+        )
+        session.add(ins)
+
+        ev = Evidence(
+            insight_id=1,
+            claim="Дорогой кредит",
+            source_title="ЦБ РФ"
+        )
+        session.add(ev)
         await session.commit()
 
     logger.info("Database seeding completed.")

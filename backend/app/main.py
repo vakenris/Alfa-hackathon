@@ -1,20 +1,23 @@
-import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
 from backend.app.core.logging import setup_logging, logger
-from backend.app.db.session import init_db
-from backend.app.api.router import api_router
+from backend.app.core.audit import AuditMiddleware
+from backend.app.db.session import init_db, async_session_factory
+from backend.app.ingestion.seeder import seed_data
+from backend.app.api.v1.router import api_v1_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: setup logging, initialize DB tables
+    """Application startup / shutdown lifecycle."""
     setup_logging()
-    logger.info("Initializing database schema...")
+    logger.info("Initializing database tables...")
     await init_db()
-    logger.info(f"{settings.PROJECT_NAME} backend core started successfully.")
+    async with async_session_factory() as session:
+        await seed_data(session)
+    logger.info(f"{settings.PROJECT_NAME} backend started successfully.")
     yield
     logger.info("Shutting down backend...")
 
@@ -25,10 +28,10 @@ app = FastAPI(
     description="Backend API для персонализированной новостной аналитики крупного бизнеса (Альфа-Банк).",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
-# CORS Middleware
+# CORS — allow frontend origins defined in settings
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -37,28 +40,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Audit Middleware — persists every non-health request to audit_logs table
+app.add_middleware(AuditMiddleware)
 
-# Request timing and audit logging middleware
-@app.middleware("http")
-async def audit_logging_middleware(request: Request, call_next):
-    start_time = time.time()
-    role = request.headers.get("X-User-Role", "CEO")
-    response = await call_next(request)
-    duration_ms = (time.time() - start_time) * 1000
-    logger.info(
-        f"{request.method} {request.url.path} | Status: {response.status_code} | "
-        f"Role: {role} | {duration_ms:.2f}ms"
-    )
-    return response
-
-
-# Include API v1 Router
-app.include_router(api_router, prefix=settings.API_V1_PREFIX)
-
-
-@app.get("/health", tags=["Health Checks"])
-async def health_check():
-    return {"status": "ok", "service": settings.PROJECT_NAME, "version": settings.VERSION}
+# API v1 routes
+app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/", tags=["Root"])
@@ -67,5 +53,14 @@ async def root():
         "service": settings.PROJECT_NAME,
         "version": settings.VERSION,
         "docs": "/docs",
-        "api_v1": settings.API_V1_PREFIX
+        "api_v1": settings.API_V1_PREFIX,
+    }
+
+
+@app.get("/health", tags=["Health Checks"])
+async def health_check():
+    return {
+        "status": "ok",
+        "service": settings.PROJECT_NAME,
+        "version": settings.VERSION,
     }

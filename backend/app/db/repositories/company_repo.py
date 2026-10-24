@@ -1,7 +1,8 @@
 from typing import List, Optional
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.app.db.models.company import Company, CounterpartyTransaction
+from backend.app.db.models.company import Company
+from backend.app.db.models.transaction import CounterpartyTransaction
 from backend.app.schemas.company import CounterpartyItem
 
 

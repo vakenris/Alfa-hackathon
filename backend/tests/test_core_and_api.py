@@ -1,87 +1,5 @@
 import pytest
-import pytest_asyncio
 import httpx
-from backend.app.main import app
-from backend.app.db.session import init_db, async_session_factory
-from backend.app.db.models.company import Company
-from backend.app.db.models.news import NewsArticle
-from backend.app.db.models.insight import Insight, Evidence
-from backend.app.db.models.agent_trace import JobRecord, AgentTraceStep
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def seed_test_database():
-    await init_db()
-    async with async_session_factory() as session:
-        # Seed test company
-        c = Company(
-            id=1,
-            synthetic_u="U_TEST_1",
-            name="ПАО «Северный Металлургический Холдинг»",
-            revenue_company=68000000000.0,
-            mainokved_code="24.10",
-            mainokved_name="Металлургия",
-            cl_product_loa_mark=True
-        )
-        session.add(c)
-
-        # Seed test news
-        n1 = NewsArticle(
-            id=1,
-            title="Ключевая ставка 14%",
-            content="ЦБ сохранил ставку 14%.",
-            category="Макроэкономика",
-            is_bank_analytics=True
-        )
-        session.add(n1)
-
-        # Seed test job and insight
-        job = JobRecord(
-            id="test-job-uuid",
-            company_id=1,
-            event_id=1,
-            status="SUCCESS"
-        )
-        session.add(job)
-
-        step = AgentTraceStep(
-            job_id="test-job-uuid",
-            step_number=1,
-            step_name="Анализ профиля",
-            description="Профиль загружен"
-        )
-        session.add(step)
-
-        ins = Insight(
-            id=1,
-            job_id="test-job-uuid",
-            company_id=1,
-            event_id=1,
-            what_happened="ЦБ сохранил ставку на уровне 14%",
-            why_important="Влияет на обслуживание кредитного портфеля",
-            consequences="Рост стоимости заимствований",
-            bank_view="Контролировать ликвидность",
-            ai_view="Оптимизировать оборотный капитал",
-            recommended_action="Провести совет казначейства",
-            relevant_bank_product="Факторинг"
-        )
-        session.add(ins)
-
-        ev = Evidence(
-            insight_id=1,
-            claim="Дорогой кредит",
-            source_title="ЦБ РФ"
-        )
-        session.add(ev)
-
-        await session.commit()
-
-
-@pytest_asyncio.fixture
-async def client():
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
 
 
 @pytest.mark.asyncio
@@ -100,12 +18,12 @@ async def test_companies_and_rbac_masking(client: httpx.AsyncClient):
     # CEO receives unmasked revenue
     resp_ceo = await client.get("/api/v1/companies/1", headers={"X-User-Role": "CEO"})
     assert resp_ceo.status_code == 200
-    assert resp_ceo.json()["revenue_company"] == 68000000000.0
+    assert resp_ceo.json()["revenue_company"] == 68500000000.0
 
     # Analyst gets rounded/masked revenue
     resp_analyst = await client.get("/api/v1/companies/1", headers={"X-User-Role": "ANALYST"})
     assert resp_analyst.status_code == 200
-    assert resp_analyst.json()["revenue_company"] == 68000000000.0
+    assert resp_analyst.json()["revenue_company"] == 68500000000.0
 
 
 @pytest.mark.asyncio
