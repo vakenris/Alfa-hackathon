@@ -1,0 +1,124 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+:root {
+  font-family: "Manrope", Arial, sans-serif;
+  font-size: 14px;
+  color: #0b101b;
+  background: #f5f6f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --red: #ff142b;
+  --muted: #7f8ba2;
+  --border: #e7ecf2;
+  --radius: 12px;
+  --font-page: clamp(24px, 2vw, 32px);
+  --font-section: 20px;
+  --font-card: 18px;
+  --font-article: clamp(22px, 2vw, 28px);
+  --font-small-heading: 16px;
+  --surface: #fff;
+  --glass-panel: linear-gradient(145deg, #fffffff5, #ffffffc7);
+  --glass-outline: #dfe3e9;
+  --glass-muted: #5e6673;
+  --glass-shadow: 0 2px 8px #24304705;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 360px;
+  background: #f5f6f8;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+button {
+  cursor: pointer;
+  color: inherit;
+  border: 0;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  line-height: 1.22;
+  letter-spacing: -0.02em;
+}
+h1 {
+  font-size: var(--font-page);
+  font-weight: 700;
+}
+h2 {
+  font-size: var(--font-section);
+  font-weight: 600;
+}
+h3 {
+  font-size: var(--font-card);
+  font-weight: 600;
+}
+p {
+  line-height: 1.5;
+}
+svg {
+  flex-shrink: 0;
+}
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 3px solid #6b5cff;
+  outline-offset: 4px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.skip-link {
+  position: fixed;
+  top: -80px;
+  left: 140px;
+  z-index: 20;
+  background: white;
+  padding: 12px;
+}
+.skip-link:focus {
+  top: 12px;
+}
+::selection {
+  background: #ffdbe0;
+}
+
+@media (max-width: 700px) {
+  :root {
+    --font-page: 24px;
+    --font-section: 18px;
+    --font-card: 17px;
+    --font-article: 22px;
+  }
+}

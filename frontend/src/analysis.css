@@ -1,0 +1,1313 @@
+/* Analysis is a company workspace, separate from the topical news feed. */
+.company-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.company-analysis .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0;
+}
+.company-analysis .page-header .eyebrow {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.company-analysis .page-header h1 {
+  font-size: 28px;
+}
+.company-analysis .page-subtitle {
+  font-size: 15px;
+  margin-top: 7px;
+}
+.analysis-demo {
+  color: #8b95a5;
+  font-size: 11px;
+  white-space: nowrap;
+  margin-top: 4px;
+}
+.analysis-summary {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 12px 0;
+  border-block: 1px solid #e0e5ec;
+  color: #788497;
+  font-size: 13px;
+}
+.analysis-summary > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.analysis-summary strong {
+  color: #202937;
+  font-size: 22px;
+  font-weight: 600;
+}
+.analysis-summary a {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  color: #69758a;
+  font-size: 12px;
+}
+.analysis-summary a:hover {
+  color: var(--red);
+}
+.analysis-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+.company-analysis .panel {
+  padding: 20px;
+  border: 1px solid #e1e6ed;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.analysis-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.company-analysis .analysis-panel-heading h2 {
+  font-size: 17px;
+  font-weight: 600;
+}
+.analysis-panel-heading > svg {
+  color: #a1aaba;
+}
+.analysis-priority {
+  color: #cc3246;
+  background: #fff0f2;
+  font-size: 10px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.risk-register-list {
+  display: grid;
+  gap: 16px;
+}
+.risk-entry + .risk-entry {
+  padding-top: 16px;
+  border-top: 1px solid #e6eaf0;
+}
+.risk-entry-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+.risk-area {
+  color: #7c889a;
+  background: #f0f3f7;
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-size: 10px;
+}
+.risk-entry h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.risk-entry > p {
+  color: #69778c;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.risk-action {
+  display: flex;
+  gap: 8px;
+  margin-top: 9px;
+  color: #35445a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.risk-action svg {
+  margin-top: 1px;
+  color: #d52b40;
+}
+.analysis-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #8a95a6;
+  font-size: 11px;
+  margin-top: 10px;
+}
+.analysis-source:hover {
+  color: var(--red);
+}
+.plan-progress {
+  color: #8b95a5;
+  font-size: 12px;
+}
+.action-plan-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.action-plan-list li + li {
+  border-top: 1px solid #e9edf2;
+}
+.action-plan-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  cursor: pointer;
+}
+.action-plan-list input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: #ed1730;
+  cursor: pointer;
+}
+.action-plan-title {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.action-plan-date {
+  color: #919baa;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.action-plan-list .is-complete .action-plan-title {
+  text-decoration: line-through;
+  color: #929ba8;
+}
+.analysis-footnote {
+  color: #929ba8;
+  font-size: 10px;
+  line-height: 1.4;
+}
+.action-plan .analysis-footnote {
+  margin-top: 12px;
+}
+.company-analysis .analysis-opportunity {
+  background: #f9fbfd;
+}
+.analysis-opportunity .analysis-panel-heading {
+  margin-bottom: 10px;
+}
+.opportunity-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 28px;
+}
+.analysis-opportunity h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.analysis-opportunity p {
+  color: #748195;
+  font-size: 12px;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+.analysis-opportunity .analysis-source {
+  margin-top: 7px;
+}
+.financing-scenario {
+  border-left: 1px solid #e1e6ee;
+  padding-left: 24px;
+}
+.financing-scenario label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px 12px;
+  color: #7e8a9c;
+  font-size: 11px;
+}
+.financing-scenario select {
+  max-width: 100%;
+  padding: 7px 8px;
+  border: 1px solid #dfe5ed;
+  border-radius: 6px;
+  background: #fff;
+  color: #34445b;
+  font-size: 11px;
+}
+.financing-scenario p {
+  margin-top: 8px;
+}
+@media (min-width: 1100px) {
+  .company-analysis {
+    display: grid;
+    grid-template-rows: auto auto minmax(min-content, 1fr) auto auto;
+    height: calc(100dvh - 2 * var(--page-inset));
+    gap: 14px;
+  }
+}
+@media (min-width: 1100px) and (max-height: 800px) {
+  .company-analysis {
+    gap: 10px;
+  }
+  .company-analysis .page-header h1 {
+    font-size: 25px;
+  }
+  .company-analysis .page-subtitle {
+    font-size: 13px;
+    margin-top: 5px;
+  }
+  .company-analysis .panel {
+    padding: 14px;
+  }
+  .analysis-summary {
+    padding-block: 8px;
+  }
+  .analysis-summary strong {
+    font-size: 19px;
+  }
+  .analysis-panel-heading {
+    margin-bottom: 10px;
+  }
+  .company-analysis .analysis-panel-heading h2 {
+    font-size: 15px;
+  }
+  .risk-register-list {
+    gap: 12px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 12px;
+  }
+  .risk-entry > p {
+    font-size: 12px;
+  }
+  .risk-entry h3 {
+    font-size: 14px;
+  }
+  .risk-action {
+    margin-top: 7px;
+    font-size: 11px;
+  }
+  .analysis-source {
+    margin-top: 7px;
+    font-size: 10px;
+  }
+  .action-plan-list label {
+    padding-block: 10px;
+    gap: 8px;
+  }
+  .action-plan-title {
+    font-size: 12px;
+  }
+  .action-plan-date {
+    font-size: 9px;
+  }
+  .analysis-opportunity p {
+    font-size: 11px;
+  }
+  .analysis-opportunity h3 {
+    font-size: 13px;
+  }
+  .analysis-opportunity .analysis-panel-heading {
+    margin-bottom: 7px;
+  }
+  .opportunity-layout {
+    gap: 20px;
+  }
+  .financing-scenario {
+    padding-left: 18px;
+  }
+}
+@media (max-width: 1099px) {
+  .analysis-workspace {
+    grid-template-columns: 1fr;
+  }
+  .company-analysis .page-header {
+    flex-wrap: wrap;
+  }
+  .analysis-demo {
+    margin: 0;
+  }
+}
+@media (max-width: 700px) {
+  .company-analysis .page-header h1 {
+    font-size: 25px;
+  }
+  .company-analysis .page-subtitle {
+    font-size: 14px;
+  }
+  .analysis-summary {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .analysis-summary > span {
+    font-size: 11px;
+    gap: 6px;
+  }
+  .analysis-summary strong {
+    font-size: 20px;
+  }
+  .analysis-summary a {
+    width: 100%;
+    margin-left: 0;
+  }
+  .company-analysis .panel {
+    padding: 16px;
+  }
+  .analysis-panel-heading {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .risk-entry-heading {
+    align-items: flex-start;
+  }
+  .risk-entry h3 {
+    font-size: 14px;
+  }
+  .action-plan-list label {
+    flex-wrap: wrap;
+    gap: 7px 10px;
+  }
+  .action-plan-date {
+    width: 100%;
+    padding-left: 26px;
+  }
+  .opportunity-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .financing-scenario {
+    border-left: 0;
+    border-top: 1px solid #e1e6ee;
+    padding-left: 0;
+    padding-top: 14px;
+  }
+}
+
+/* Visual hierarchy is tied to actual risks and checklist completion. */
+.analysis-summary > span {
+  align-items: center;
+}
+.analysis-summary > span > svg {
+  color: #8b97a9;
+  margin-right: 3px;
+}
+.analysis-summary > span:first-child > svg {
+  color: #e22a41;
+}
+.risk-register-list {
+  gap: 18px;
+}
+.risk-entry-heading {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.risk-entry-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: #dc2940;
+  background: #fff0f2;
+}
+.risk-entry-heading > div {
+  flex: 1;
+}
+.risk-entry-heading .risk-area {
+  display: block;
+  padding: 0;
+  margin-bottom: 4px;
+  background: transparent;
+  font-size: 10px;
+}
+.risk-entry-index {
+  color: #c1c9d5;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+.risk-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+.risk-flow-impact,
+.risk-flow-action {
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.risk-flow-impact {
+  background: #f3f6fa;
+}
+.risk-flow-action {
+  background: #fff4f5;
+  border-left: 2px solid #e83249;
+}
+.risk-flow-label {
+  display: block;
+  color: #8a96a8;
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+.risk-flow-action .risk-flow-label {
+  color: #d93a4e;
+}
+.risk-flow p {
+  color: #45546a;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.risk-flow-connector {
+  display: grid;
+  place-items: center;
+  color: #bdc5d1;
+}
+.risk-entry .analysis-source {
+  margin-top: 8px;
+}
+.action-plan > .analysis-panel-heading {
+  margin-bottom: 8px;
+}
+.plan-heading-subtitle {
+  display: block;
+  color: #909aab;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.plan-progress-visual {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+}
+.plan-progress-visual svg {
+  display: block;
+  transform: rotate(-90deg);
+}
+.plan-ring-track,
+.plan-ring-value {
+  fill: none;
+  stroke-width: 4;
+}
+.plan-ring-track {
+  stroke: #edf0f5;
+}
+.plan-ring-value {
+  stroke: #ed243e;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s;
+}
+.plan-progress-visual > span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding-top: 15px;
+}
+.plan-progress-visual strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: #28364a;
+}
+.plan-progress-visual small {
+  font-size: 10px;
+  color: #a3adbc;
+}
+.action-plan-list li {
+  position: relative;
+}
+.action-plan-list li + li {
+  border-top: 0;
+}
+.action-plan-list li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  bottom: -50%;
+  width: 1px;
+  background: #e5eaf1;
+  pointer-events: none;
+}
+.action-plan-list label {
+  position: relative;
+  gap: 12px;
+  padding-block: 13px;
+}
+.action-plan-list input {
+  appearance: none;
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border: 1.5px solid #d3dbe6;
+  border-radius: 50%;
+  background: #fff;
+}
+.action-plan-list input:hover {
+  border-color: #ec2941;
+}
+.action-plan-list input:checked {
+  border-color: #ed243e;
+  background: #ed243e
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 10 3 3 7-7'/%3E%3C/svg%3E")
+    center/18px no-repeat;
+}
+.action-plan-list .is-complete::after {
+  background: #efb8c0;
+}
+.action-plan-date {
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #f3f6fa;
+  color: #8b98aa;
+}
+.scenario-label {
+  display: block;
+  color: #7d899c;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+.scenario-switch {
+  display: flex;
+  padding: 3px;
+  gap: 4px;
+  background: #edf1f6;
+  border-radius: 8px;
+}
+.scenario-switch button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 9px;
+  color: #7e8ba0;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.scenario-switch button[aria-pressed="true"] {
+  background: #fff;
+  color: #d72c43;
+  box-shadow: 0 1px 5px #26374b0a;
+}
+.scenario-outcome {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+.scenario-outcome-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #8c9aad;
+  background: #eef2f7;
+  border-radius: 8px;
+}
+.scenario-outcome p {
+  margin: 0;
+}
+@media (min-width: 1100px) and (max-height: 800px) {
+  .risk-register-list {
+    gap: 12px;
+  }
+  .risk-entry-heading {
+    margin-bottom: 8px;
+  }
+  .risk-entry-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+  .risk-entry-heading .risk-area {
+    margin-bottom: 2px;
+    font-size: 9px;
+  }
+  .risk-flow-impact,
+  .risk-flow-action {
+    padding: 8px 10px;
+  }
+  .risk-flow p {
+    font-size: 11px;
+  }
+  .risk-flow-label {
+    font-size: 9px;
+    margin-bottom: 4px;
+  }
+  .risk-flow {
+    grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+    gap: 4px;
+  }
+  .risk-flow-connector svg {
+    width: 15px;
+  }
+  .action-plan-list label {
+    padding-block: 10px;
+  }
+  .plan-progress-visual {
+    width: 44px;
+    height: 44px;
+  }
+  .plan-progress-visual svg {
+    width: 44px;
+    height: 44px;
+  }
+  .plan-progress-visual > span {
+    padding-top: 12px;
+  }
+  .plan-progress-visual strong {
+    font-size: 13px;
+  }
+  .scenario-label {
+    margin-bottom: 5px;
+    font-size: 10px;
+  }
+  .scenario-switch button {
+    padding: 6px 7px;
+    font-size: 10px;
+    gap: 5px;
+  }
+  .scenario-outcome {
+    margin-top: 7px;
+    gap: 8px;
+  }
+  .scenario-outcome-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .plan-heading-subtitle {
+    font-size: 10px;
+  }
+}
+@media (max-width: 700px) {
+  .risk-flow {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .risk-flow-connector {
+    height: 16px;
+    transform: rotate(90deg);
+  }
+  .risk-flow-impact,
+  .risk-flow-action {
+    padding: 10px 12px;
+  }
+  .action-plan-date {
+    width: auto;
+    margin-left: 32px;
+    padding: 4px 7px;
+  }
+  .action-plan-list label {
+    display: grid;
+    grid-template-columns: 20px 1fr;
+  }
+  .action-plan-title {
+    grid-column: 2;
+  }
+  .action-plan-date {
+    grid-column: 2;
+    margin-left: 0;
+    justify-self: start;
+  }
+  .action-plan-list input {
+    grid-row: 1 / 3;
+  }
+  .scenario-switch button {
+    min-height: 38px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-ring-value {
+    transition: none;
+  }
+}
+
+@media (min-width: 1100px) and (max-height: 700px) {
+  .company-analysis {
+    gap: 8px;
+  }
+  .company-analysis .page-header h1 {
+    font-size: 23px;
+  }
+  .company-analysis .page-subtitle {
+    margin-top: 3px;
+    font-size: 12px;
+  }
+  .analysis-summary {
+    padding-block: 6px;
+  }
+  .company-analysis .panel {
+    padding: 12px;
+  }
+  .risk-register-list {
+    gap: 8px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 8px;
+  }
+  .risk-entry-heading {
+    margin-bottom: 6px;
+  }
+  .risk-flow-impact,
+  .risk-flow-action {
+    padding: 6px 8px;
+  }
+  .risk-flow-label {
+    margin-bottom: 3px;
+  }
+  .analysis-opportunity .analysis-panel-heading {
+    margin-bottom: 5px;
+  }
+}
+
+/* Reference styling: clear grouping for risks, neutral opportunity and scenarios. */
+.company-analysis .analysis-panel-heading h2 {
+  font-weight: 700;
+  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.company-analysis .analysis-panel-heading h2::before {
+  content: "";
+  width: 3px;
+  height: 22px;
+  border-radius: 2px;
+  background: #f0223e;
+}
+.company-analysis .analysis-opportunity .analysis-panel-heading h2::before {
+  background: #aeb8c6;
+}
+.analysis-demo {
+  display: inline-block;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: #edf1f6;
+  color: #6b798d;
+}
+.analysis-summary {
+  border: 0;
+  gap: 12px;
+  padding-block: 0;
+}
+.analysis-summary > span {
+  gap: 7px;
+  padding: 10px 12px;
+  background: #ffffffb8;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px #26374b03;
+  font-size: 11px;
+}
+.analysis-summary strong {
+  font-size: 21px;
+}
+.analysis-summary a {
+  padding: 12px 16px;
+  border-radius: 11px;
+  background: #ffebee;
+  color: #d4223b;
+  font-size: 12px;
+  font-weight: 500;
+}
+.risk-register-list {
+  gap: 14px;
+}
+.risk-entry {
+  padding: 16px;
+  border-radius: 14px;
+  background: #fff3f5;
+}
+.risk-entry:nth-child(2) {
+  background: #f4f7fa;
+}
+.risk-entry + .risk-entry {
+  padding-top: 16px;
+  border-top: 0;
+}
+.risk-entry-heading {
+  margin-bottom: 12px;
+}
+.risk-entry-heading .risk-area {
+  text-transform: uppercase;
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+.risk-entry-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #ffe1e7;
+}
+.risk-entry:nth-child(2) .risk-entry-icon {
+  color: #4b596f;
+  background: #e7edf4;
+}
+.risk-entry h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.risk-entry .analysis-priority {
+  padding: 6px 9px;
+  background: #ffe1e7;
+}
+.risk-entry-index {
+  margin-left: 6px;
+}
+.risk-flow {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: center;
+}
+.risk-flow-connector,
+.risk-flow-impact > .risk-flow-label {
+  display: none;
+}
+.risk-flow-impact {
+  background: transparent;
+  padding: 0;
+}
+.risk-flow-impact p {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.risk-flow-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff66;
+  border: 1px solid #f4dce2;
+  border-radius: 10px;
+}
+.risk-action-content {
+  flex: 1;
+  min-width: 0;
+}
+.risk-flow-action .risk-flow-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #e42943;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.risk-flow-action p {
+  color: #344259;
+  font-size: 12px;
+}
+.risk-action-open {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: #f0203b;
+  color: #fff;
+}
+.risk-action-open:hover {
+  background: #d71831;
+}
+.risk-entry .analysis-source {
+  color: #7b899d;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.action-plan-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  gap: 9px;
+  align-items: center;
+}
+.action-plan-list label {
+  min-width: 0;
+  padding-block: 14px;
+}
+.action-plan-list li:not(:last-child) label {
+  border-bottom: 1px solid #edf0f5;
+}
+.action-plan-title {
+  font-weight: 500;
+}
+.action-plan-date {
+  padding: 6px 8px;
+  border-radius: 9px;
+}
+.action-plan-source {
+  display: grid;
+  place-items: center;
+  color: #98a5b7;
+}
+.action-plan-source:hover {
+  color: #d8233b;
+}
+.company-analysis .analysis-opportunity {
+  background: #fff;
+}
+.opportunity-copy {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 12px;
+}
+.opportunity-symbol {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: #e9eef4;
+  color: #6b7a90;
+}
+.analysis-opportunity h3 {
+  color: #2d3a4d;
+  font-weight: 600;
+}
+.analysis-opportunity .analysis-source {
+  color: #58677c;
+  background: #fff;
+  border: 1px solid #dfe5ed;
+  border-radius: 7px;
+  padding: 7px 10px;
+  text-decoration: none;
+}
+.analysis-opportunity .analysis-source:hover {
+  border-color: #b4bfcd;
+}
+.financing-scenario {
+  border-left-color: #e9edf3;
+}
+.analysis-opportunity .scenario-switch button[aria-pressed="true"] {
+  color: #3d4e66;
+}
+.scenario-sketch {
+  margin-top: 8px;
+}
+.scenario-sketch svg {
+  display: block;
+  width: 100%;
+  height: 86px;
+  overflow: visible;
+}
+.scenario-grid-line {
+  fill: none;
+  stroke: #ecf0f5;
+  stroke-width: 1;
+}
+.scenario-path {
+  fill: none;
+  stroke: #c1cbd8;
+  stroke-width: 2;
+}
+.scenario-path--flat {
+  stroke-dasharray: 6 5;
+}
+.scenario-path.is-active {
+  stroke: #536780;
+  stroke-width: 2.5;
+}
+.scenario-origin {
+  fill: #7c8da4;
+}
+.scenario-sketch > span {
+  display: block;
+  text-align: right;
+  font-size: 9px;
+  color: #9aa5b6;
+  margin-top: 3px;
+}
+.analysis-opportunity .scenario-outcome {
+  margin-top: 7px;
+}
+.analysis-opportunity .scenario-outcome-icon {
+  display: none;
+}
+@media (min-width: 1500px) {
+  .company-analysis {
+    grid-template-rows: auto minmax(min-content, 1fr) auto auto;
+  }
+  .company-analysis > .page-header {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 100px;
+  }
+  .company-analysis > .page-header > div:first-child {
+    max-width: calc(100% - 640px);
+  }
+  .company-analysis > .analysis-summary {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    align-self: end;
+  }
+  .analysis-summary a {
+    margin-left: 12px;
+  }
+}
+@media (min-width: 1100px) and (max-height: 900px) {
+  .risk-entry {
+    padding: 12px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 12px;
+  }
+  .risk-entry-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  .risk-entry h3 {
+    font-size: 14px;
+  }
+  .risk-entry-heading {
+    margin-bottom: 9px;
+  }
+  .risk-flow {
+    gap: 12px;
+  }
+  .risk-flow-action {
+    padding: 9px;
+    gap: 8px;
+  }
+  .risk-action-open {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  .risk-flow-action p,
+  .risk-flow-impact p {
+    font-size: 11px;
+  }
+  .risk-flow-action .risk-flow-label {
+    font-size: 10px;
+    margin-bottom: 4px;
+  }
+  .risk-entry .analysis-priority {
+    font-size: 9px;
+    padding: 5px 6px;
+  }
+  .action-plan-list label {
+    padding-block: 11px;
+  }
+  .company-analysis .analysis-panel-heading h2 {
+    font-size: 16px;
+  }
+  .opportunity-copy {
+    padding: 12px;
+    gap: 12px;
+  }
+  .opportunity-symbol {
+    width: 36px;
+    height: 36px;
+  }
+  .scenario-sketch svg {
+    height: 54px;
+  }
+}
+@media (min-width: 1100px) and (max-height: 800px) {
+  .analysis-summary > span {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+  .analysis-summary a {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+  .risk-entry {
+    padding: 10px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 10px;
+  }
+  .risk-register-list {
+    gap: 10px;
+  }
+  .risk-entry-index {
+    font-size: 15px;
+  }
+  .risk-entry-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .risk-entry h3 {
+    font-size: 13px;
+  }
+  .risk-entry-heading .risk-area {
+    font-size: 9px;
+  }
+  .risk-flow-action {
+    padding: 8px;
+  }
+  .risk-action-open {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+  .risk-flow-action p,
+  .risk-flow-impact p {
+    font-size: 10px;
+  }
+  .risk-flow-action .risk-flow-label {
+    font-size: 9px;
+  }
+  .risk-entry .analysis-source {
+    font-size: 9px;
+  }
+  .action-plan-list label {
+    padding-block: 10px;
+  }
+  .opportunity-copy {
+    padding: 10px;
+    gap: 10px;
+  }
+  .analysis-opportunity .analysis-source {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+  .scenario-sketch {
+    display: none;
+  }
+}
+@media (min-width: 1100px) and (max-height: 700px) {
+  .risk-entry {
+    padding: 8px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 8px;
+  }
+  .risk-entry-heading {
+    margin-bottom: 7px;
+  }
+  .risk-flow-action {
+    padding: 6px;
+  }
+  .risk-flow-action .risk-flow-label svg {
+    display: none;
+  }
+  .risk-entry-icon {
+    width: 26px;
+    height: 26px;
+  }
+  .risk-entry .analysis-priority {
+    display: none;
+  }
+  .risk-register-list {
+    gap: 8px;
+  }
+  .opportunity-symbol {
+    display: none;
+  }
+}
+@media (max-width: 1099px) {
+  .risk-flow {
+    gap: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .analysis-summary {
+    gap: 8px;
+  }
+  .analysis-summary > span {
+    flex: 1;
+    justify-content: center;
+    font-size: 10px;
+    padding: 9px 6px;
+  }
+  .analysis-summary > span > svg {
+    display: none;
+  }
+  .analysis-summary a {
+    justify-content: center;
+  }
+  .risk-entry {
+    padding: 12px;
+  }
+  .risk-entry + .risk-entry {
+    padding-top: 12px;
+  }
+  .risk-entry-heading {
+    flex-wrap: wrap;
+  }
+  .risk-entry .analysis-priority {
+    display: none;
+  }
+  .risk-entry-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .risk-entry h3 {
+    font-size: 14px;
+  }
+  .risk-flow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .risk-action-open {
+    width: 34px;
+    height: 34px;
+  }
+  .action-plan-source {
+    display: none;
+  }
+  .action-plan-list li {
+    display: block;
+  }
+  .opportunity-copy {
+    padding: 14px;
+  }
+  .opportunity-symbol {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Keep the workspace within shorter desktop windows. */
+@media (min-width: 1100px) and (max-height: 800px) {
+  .company-analysis .panel { padding: 12px; }
+  .company-analysis .analysis-panel-heading { margin-bottom: 10px; }
+  .company-analysis .analysis-summary { padding-block: 4px; }
+}
+@media (min-width: 1100px) and (max-height: 700px) {
+  .company-analysis .panel { padding: 10px; }
+  .company-analysis .analysis-panel-heading { margin-bottom: 8px; }
+  .company-analysis .page-subtitle { margin-top: 4px; }
+  .company-analysis .analysis-summary { padding-block: 0; }
+}
+.analysis-opportunity .analysis-source:hover { color: #35465e; }
+
+@media (min-width: 1100px) and (max-height: 800px) {
+ .company-analysis { gap: 8px; }
+ .company-analysis .analysis-summary { padding-block: 0; }
+ .risk-entry, .risk-entry + .risk-entry { padding: 7px; }
+ .risk-entry-heading { margin-bottom: 5px; }
+ .risk-entry .analysis-source { margin-top: 4px; }
+ .risk-register-list { gap: 8px; }
+ .opportunity-copy { padding: 8px; }
+}
+@media (min-width: 1100px) and (max-height: 700px) {
+ .company-analysis { gap: 6px; }
+ .risk-entry, .risk-entry + .risk-entry { padding: 6px; }
+ .company-analysis .panel { padding: 8px; }
+ .risk-entry-heading { margin-bottom: 4px; }
+ .company-analysis .analysis-panel-heading { margin-bottom: 6px; }
+}

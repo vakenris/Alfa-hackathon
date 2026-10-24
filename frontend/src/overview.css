@@ -1,0 +1,202 @@
+/* A common filter bar and content area for the dashboard and analysis. */
+.overview-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 26px;
+  border-bottom: 1px solid #dfe4ec;
+}
+.overview-tabs button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0 15px;
+  background: transparent;
+  color: #6a7689;
+  font-size: 14px;
+  white-space: nowrap;
+  border-radius: 3px;
+}
+.overview-tabs button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: transparent;
+}
+.overview-tabs button[aria-selected="true"] {
+  color: #161d29;
+  font-weight: 600;
+}
+.overview-tabs button[aria-selected="true"]::after {
+  background: var(--red);
+}
+.overview-tabs button:hover {
+  color: #1c2738;
+}
+.overview-tab-count {
+  display: grid;
+  place-items: center;
+  min-width: 23px;
+  height: 22px;
+  padding-inline: 6px;
+  border-radius: 6px;
+  background: #e9edf2;
+  color: #5c697d;
+  font-size: 11px;
+  font-weight: 600;
+}
+.overview-tabs button[aria-selected="true"] .overview-tab-count {
+  background: #ffeaed;
+  color: #d5213a;
+}
+.overview-content {
+  min-width: 0;
+}
+.overview-content:focus {
+  outline: none;
+}
+.overview-content:focus-visible {
+  outline: 2px solid #b2bbca;
+  outline-offset: 6px;
+  border-radius: 8px;
+}
+.analysis-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b778b;
+  font-size: 13px;
+}
+.analysis-entry:hover {
+  color: var(--red);
+}
+.overview-content .news-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+@media (min-width: 1100px) {
+  .home-page .news-section {
+    grid-template-rows: auto minmax(min-content, 1fr);
+    gap: 16px;
+  }
+  .home-page .overview-content > .news-carousel {
+    height: 100%;
+  }
+  .home-page .news-card-summary {
+    font-size: 13px;
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .home-page .news-image-link {
+    display: flex;
+  }
+  .home-page .news-image {
+    min-height: 80px;
+  }
+}
+@media (max-width: 1099px) {
+  .overview-tabs {
+    margin-bottom: 20px;
+  }
+}
+@media (max-width: 700px) {
+  .overview-tabs {
+    gap: 16px;
+    overflow-x: auto;
+    padding-inline: 2px;
+  }
+  .overview-tabs button {
+    font-size: 12px;
+    gap: 6px;
+    padding-block: 12px;
+  }
+  .overview-tab-count {
+    min-width: 19px;
+    height: 19px;
+    font-size: 10px;
+  }
+  .analysis-entry {
+    font-size: 11px;
+  }
+  .home-page .section-heading {
+    align-items: flex-start;
+  }
+}
+
+@media (min-width: 1100px) {
+  .home-page .news-grid--single {
+    display: block;
+    height: auto;
+    max-width: 1000px;
+  }
+  .home-page .news-grid--single .news-card {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-row: auto;
+    gap: 12px;
+  }
+  .home-page .news-grid--single .news-image-link {
+    position: relative;
+    min-height: 180px;
+  }
+  .home-page .news-grid--single .news-image {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+  }
+  .home-page .news-grid--single .news-card-body {
+    padding: 12px 10px;
+  }
+}
+
+.home-news-tools {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  border-bottom: 1px solid #dfe4ec;
+  min-width: 0;
+}
+.home-news-tools .overview-tabs {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+.home-news-tools .analysis-entry {
+  align-self: center;
+  flex-shrink: 0;
+}
+@media (max-width: 1099px) {
+  .home-news-tools {
+    margin-bottom: 20px;
+  }
+}
+@media (max-width: 700px) {
+  .home-news-tools {
+    gap: 12px;
+  }
+}
+
+/* The indicator travels between categories while the feed crossfades. */
+.overview-tabs { position: relative; }
+.overview-tabs::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  width: var(--tab-width, 0px);
+  transform: translateX(var(--tab-left, 0px));
+  background: var(--red);
+  transition: transform 280ms cubic-bezier(.2,.7,.2,1), width 280ms cubic-bezier(.2,.7,.2,1);
+  pointer-events: none;
+}
+.overview-tabs button::after { display: none; }
+@media (prefers-reduced-motion: reduce) {
+ .overview-tabs::after { transition: none; }
+}
