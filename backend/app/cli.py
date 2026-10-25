@@ -15,6 +15,10 @@ from backend.app.ingestion.companies import (
     read_companies_csv,
     save_companies,
 )
+from backend.app.ingestion.payments import (
+    check_payments,
+    import_payments,
+)
 from backend.app.ingestion.seeder import seed_data
 
 
@@ -28,18 +32,35 @@ async def run_command(args: argparse.Namespace) -> None:
 
             return
 
-        companies, report = read_companies_csv(
-            args.companies
-        )
+        if args.command == "seed-data":
+            companies, report = read_companies_csv(
+                args.companies
+            )
 
-        if not args.dry_run:
+            if not args.dry_run:
+                await init_db()
+
+                async with async_session_factory() as session:
+                    await save_companies(
+                        session,
+                        companies,
+                        report,
+                    )
+
+        elif args.dry_run:
+            report = check_payments(
+                args.payments,
+                args.exclude_company,
+            )
+
+        else:
             await init_db()
 
             async with async_session_factory() as session:
-                await save_companies(
+                report = await import_payments(
                     session,
-                    companies,
-                    report,
+                    args.payments,
+                    args.exclude_company,
                 )
 
         print(
@@ -87,6 +108,29 @@ def main() -> None:
     )
 
     companies.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Проверить CSV без записи в БД",
+    )
+
+    payments = commands.add_parser(
+        "ingest-payments",
+        help="Загрузить CSV платежей",
+    )
+
+    payments.add_argument(
+        "--payments",
+        required=True,
+        type=Path,
+    )
+
+    payments.add_argument(
+        "--exclude-company",
+        action="append",
+        default=[],
+    )
+
+    payments.add_argument(
         "--dry-run",
         action="store_true",
         help="Проверить CSV без записи в БД",
