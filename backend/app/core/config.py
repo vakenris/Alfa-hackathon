@@ -1,4 +1,5 @@
 from typing import List
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = False
 
-    # Server configuration
+    # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
@@ -23,16 +24,17 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./alfa_analytics.db"
+    AUTO_SEED_DEMO: bool = False
 
-    # Redis (for Pub/Sub and Queue)
+    # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     USE_IN_MEMORY_BUS: bool = True
 
-    # Security & RBAC
+    # Security
     SECRET_KEY: str = "alfa-hackathon-secret-key-2026"
     ALGORITHM: str = "HS256"
 
-    # LLM Settings & Budget Guardian (500 RUB limit)
+    # LLM
     LLM_API_BASE_URL: str = "https://api.example.com/v1"
     LLM_API_KEY: str = "mock-key"
     LLM_MAX_DAILY_BUDGET_RUB: float = 500.0
@@ -41,7 +43,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
     )
 
 
