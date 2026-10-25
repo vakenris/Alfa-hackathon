@@ -1,46 +1,35 @@
-import { useId, useState } from "react";
 import { Icon } from "./Icon";
 import { Panel } from "./ui";
-import type { BusinessOpportunity } from "../data/opportunities";
-import { news } from "../data/dashboard";
+import type { EventPanelProps } from "./BusinessInsights";
 
-export function OpportunitiesWidget({ items }: { items: BusinessOpportunity[] }) {
-  const id = useId();
-  const [selectedId, setSelectedId] = useState(items[0]?.id);
-  const [scenarioIds, setScenarioIds] = useState<Record<string, string>>({});
-  const selected = items.find(item => item.id === selectedId) ?? items[0];
-  if (!selected) return <Panel className="analysis-opportunity"><h2>Возможности для бизнеса</h2><p>Пока нет выявленных возможностей.</p></Panel>;
-  const scenario = selected.scenarios.find(item => item.id === scenarioIds[selected.id]) ?? selected.scenarios[0];
-  const sources = news.filter(item => selected.sourceIds.includes(item.id));
-  return <Panel className="analysis-opportunity opportunities-widget">
-    <div className="analysis-panel-heading">
-      <h2>Возможности для бизнеса</h2>
-      {items.length > 1 && <label className="opportunity-picker">
-        <span className="sr-only">Выбрать возможность</span>
-        <select value={selected.id} onChange={event => setSelectedId(event.target.value)}>
-          {items.map(item => <option key={item.id} value={item.id}>{item.area}: {item.title}</option>)}
-        </select>
-      </label>}
+function benefitPoints(text: string): string[] {
+  const normalized = text.replace(/^(?:Сгенерированный\s+)?AI-анализ:\s*/iu, "").replace(/^компании рекомендуется\s*/iu, "");
+  return normalized.split(/\n+|;\s*|\s+и\s+(?=хеджировать|снизить|сохранить|зафиксировать|оптимизировать|актуализировать)/iu)
+    .map(point => point.trim()).filter(Boolean).slice(0, 3)
+    .map(point => point.charAt(0).toUpperCase() + point.slice(1).replace(/[.;]$/, ""));
+}
+
+export function BankProducts({insights, news, selected, onSelect, onOpen}: EventPanelProps) {
+  const products = insights.filter(insight => insight.relevant_bank_product);
+  const source = news.find(item => item.id === String(selected?.event_id));
+  const product = selected?.relevant_bank_product;
+  const benefits = selected ? benefitPoints(selected.ai_view) : [];
+  return <Panel className="bank-products bank-products-wide">
+    <div className="bank-products-header">
+      <div className="analysis-panel-heading"><div><h2>Продукты банка</h2><p>Решения, которые могут быть полезны в текущей ситуации.</p></div></div>
+      <label className="bank-product-picker"><span className="sr-only">Продукт банка по событию</span><select value={product ? selected!.id : ""} onChange={event => onSelect(Number(event.target.value))} disabled={!products.length}>
+        {!product && <option value="">Продукт для события не предложен</option>}
+        {products.map(insight => <option key={insight.id} value={insight.id}>Продукты банка: {insight.relevant_bank_product}{products.length > 1 ? ` · ${news.find(item => item.id === String(insight.event_id))?.category ?? "Событие"}` : ""}</option>)}
+      </select></label>
     </div>
-    <div className="opportunity-layout">
-      <div className="opportunity-copy" key={selected.id}>
-        <span className="opportunity-topic-icon"><Icon name={selected.icon} size={24}/></span>
-        <div>
-          <h3>{selected.title}</h3><p>{selected.description}</p>
-          <div className="opportunity-sources" aria-label="Связанные новости">
-            {sources.map(source => <a className="analysis-source" key={source.id} href={`#/news/${source.id}`} title={source.title}>{source.category}<Icon name="external" size={13}/></a>)}
-          </div>
+    {selected && product ? <div className="bank-product-surface">
+      <div className="bank-product-intro">
+        <span className="bank-product-symbol"><Icon name={/фактор|лизинг/i.test(product) ? "briefcase" : "percent"} size={29}/></span>
+        <div className="bank-product-copy"><h3>{product}</h3><p>{selected.why_important}</p>
+          <div className="bank-product-actions"><button className="bank-product-details" onClick={() => onOpen({title: product, text: [selected.why_important, selected.bank_view, selected.ai_view, selected.recommended_action].join("\n\n")})}>Подробнее <Icon name="arrow" size={16}/></button>{source && <a className="bank-event-category" href={`#/news/${source.id}`}>{source.category}<Icon name="external" size={13}/></a>}</div>
         </div>
       </div>
-      <div className="financing-scenario opportunity-scenarios">
-        {scenario ? <>
-          <span className="scenario-label" id={id}>Сценарии и возможные действия</span>
-          <div className="scenario-switch" role="group" aria-labelledby={id}>
-            {selected.scenarios.map(item => <button type="button" key={item.id} aria-pressed={item.id === scenario.id} onClick={() => setScenarioIds(current => ({...current, [selected.id]: item.id}))}>{item.label}</button>)}
-          </div>
-          <div className="scenario-outcome" aria-live="polite"><div><p>{scenario.effect}</p><p className="opportunity-next-step"><strong>Следующий шаг: </strong>{scenario.action}</p></div></div>
-        </> : <p>Для оценки возможности нужны дополнительные данные.</p>}
-      </div>
-    </div>
+      <div className="bank-product-benefits"><h3>Как это поможет</h3><ul>{benefits.map((benefit, index) => <li key={index}><span className="bank-benefit-check"><Icon name="check" size={13}/></span><span>{benefit}</span></li>)}</ul></div>
+    </div> : <p className="event-panel-empty">{selected ? "Для этой новости банковский продукт не предложен. Рекомендации доступны выше." : "Продукты и сценарии появятся после автоматического анализа новостей."}</p>}
   </Panel>;
 }

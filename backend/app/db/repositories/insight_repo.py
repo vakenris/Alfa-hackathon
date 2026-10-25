@@ -69,6 +69,7 @@ class InsightRepository:
             select(Insight)
             .where(Insight.company_id == company_id, Insight.event_id == event_id)
             .order_by(Insight.id.desc())
+            .limit(1)
             .options(selectinload(Insight.evidences))
         )
         result = await self.session.execute(stmt)

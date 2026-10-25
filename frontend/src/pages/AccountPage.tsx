@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../components/Icon";
 import { Badge, IconBubble, Modal, Panel } from "../components/ui";
-import { companies } from "../data/dashboard";
+
 export interface Profile {
   name: string;
   position: string;
@@ -10,11 +10,13 @@ export interface Profile {
   phone: string;
 }
 export function AccountPage({
+  companies,
   profile,
   setProfile,
   company,
   setCompany,
 }: {
+  companies: string[];
   profile: Profile;
   setProfile: (p: Profile) => void;
   company: string;
@@ -79,7 +81,7 @@ export function AccountPage({
             </button>
             {saved && (
               <p className="saved-message" role="status">
-                Профиль сохранён
+                Профиль сохранён в этом браузере
               </p>
             )}
           </div>

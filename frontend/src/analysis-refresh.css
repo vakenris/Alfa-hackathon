@@ -2,14 +2,14 @@
 .company-analysis > .page-header { position:relative; min-height:110px; isolation:isolate; }
 .finance-art { pointer-events:none; }
 .page-header > .finance-art { position:absolute; width:320px; height:160px; right:230px; top:0; z-index:-1; }
-.company-analysis .analysis-summary > span > svg { color:#f01430; }
+.company-analysis .analysis-summary > span > svg { color:var(--red); }
 .company-analysis .analysis-summary a { background:var(--red); color:white; border-radius:10px; box-shadow:none; padding:12px 20px; }
 .company-analysis .analysis-summary { justify-self:stretch; }
 .company-analysis .risk-entry { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); grid-template-rows:auto 1fr auto; gap:8px 16px; position:relative; background:linear-gradient(115deg,#fff4f5,#fff 65%); padding:16px; }
 .company-analysis .risk-entry:nth-child(2) { background:linear-gradient(115deg,#fff6f6,#f8fafc 65%); }
 .company-analysis .risk-entry-heading { grid-column:1; grid-row:1; margin:0; align-items:center; }
-.company-analysis .risk-entry-icon { background:linear-gradient(145deg,#ff9297,#f01c36); color:white; box-shadow:0 6px 14px #ef244522; border-radius:14px; width:48px; height:48px; flex-shrink:0; }
-.company-analysis .risk-entry:nth-child(2) .risk-entry-icon { background:linear-gradient(145deg,#ff9297,#f01c36); color:white; }
+.company-analysis .risk-entry-icon { background:linear-gradient(145deg,#ff9297,var(--red)); color:white; box-shadow:0 6px 14px #ef244522; border-radius:14px; width:48px; height:48px; flex-shrink:0; }
+.company-analysis .risk-entry:nth-child(2) .risk-entry-icon { background:linear-gradient(145deg,#ff9297,var(--red)); color:white; }
 .company-analysis .risk-entry .analysis-priority { display:none; }
 .company-analysis .risk-entry-index { position:absolute; top:14px; right:14px; color:#b9b9c3; font-size:22px; }
 .company-analysis .risk-flow { display:contents; }
@@ -18,8 +18,8 @@
 .company-analysis .risk-flow-action { grid-column:2; grid-row:1/4; display:flex; flex-direction:column; align-items:stretch; justify-content:space-between; background:linear-gradient(140deg,#fff1f3,#fff8f9); padding:18px 14px 12px; gap:12px; border:0; }
 .company-analysis .risk-action-content { padding-right:18px; }
 .company-analysis .risk-action-open { width:100%; height:auto; min-height:34px; border-radius:10px; display:flex; justify-content:center; gap:14px; font-size:11px; padding:8px 10px; background:var(--red); }
-.company-analysis .risk-entry:nth-child(2) .risk-action-open { background:transparent; border:1px solid #ff9aa6; color:#ee1733; }
-.action-plan-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:#fff0f3; color:#f01430; flex-shrink:0; }
+.company-analysis .risk-entry:nth-child(2) .risk-action-open { background:transparent; border:1px solid #ff9aa6; color:var(--red); }
+.action-plan-icon { display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:#fff0f3; color:var(--red); flex-shrink:0; }
 .company-analysis .action-plan-date { display:inline-flex; align-items:center; gap:6px; }
 .company-analysis .action-plan-list label { gap:12px; }
 .company-analysis .opportunity-copy { position:relative; isolation:isolate; min-height:145px; background:linear-gradient(110deg,#fff,#fff3f5); padding:16px; overflow:hidden; }
@@ -105,9 +105,9 @@
 }
 .company-analysis .risk-entry:nth-child(2) { background:#f4f7fa; }
 .company-analysis .risk-entry-heading { grid-column:1/-1; padding-right:150px; gap:16px; }
-.company-analysis .risk-entry-icon { width:48px; height:48px; background:#ffe1e7; color:#f01430; box-shadow:none; }
+.company-analysis .risk-entry-icon { width:48px; height:48px; background:#ffe1e7; color:var(--red); box-shadow:none; }
 .company-analysis .risk-entry:nth-child(2) .risk-entry-icon { background:#e7edf3; color:#1c293b; }
-.company-analysis .risk-entry .analysis-priority { display:block; position:absolute; right:64px; top:14px; margin:0; padding:7px 10px; background:#ffe0e6; color:#ef1733; border-radius:9px; }
+.company-analysis .risk-entry .analysis-priority { display:block; position:absolute; right:64px; top:14px; margin:0; padding:7px 10px; background:#ffe0e6; color:var(--red); border-radius:9px; }
 .company-analysis .risk-entry-index { display:block; top:17px; right:16px; color:#8190a5; font-size:18px; }
 .company-analysis .risk-flow-impact { padding:6px 0 0; }
 .company-analysis .risk-entry > .analysis-source { margin:0; }
@@ -195,14 +195,14 @@
 
 /* Equal widget heights, with the extra room shared by their content. */
 @media (min-width:1100px) {
- .company-analysis { grid-template-rows:auto auto auto auto; align-content:start; }
+ .company-analysis { grid-template-rows:auto minmax(0,max-content) auto auto; align-content:start; }
  .company-analysis .analysis-workspace { align-items:stretch; }
  .company-analysis .risk-register,
  .company-analysis .action-plan { align-self:stretch; display:flex; flex-direction:column; min-width:0; }
- .company-analysis .risk-register-list { flex:1; grid-template-rows:repeat(2,minmax(min-content,1fr)); }
- .company-analysis .action-plan-list { flex:1; display:flex; flex-direction:column; }
- .company-analysis .action-plan-list li { flex:1; }
- .company-analysis .action-plan-list label { height:100%; }
+ .company-analysis .risk-register-list { flex:1; grid-template-rows:none; grid-auto-rows:max-content; align-content:start; min-height:0; overflow-y:auto; }
+ .company-analysis .action-plan-list { flex:1; display:flex; flex-direction:column; justify-content:flex-start; min-height:0; overflow-y:auto; }
+ .company-analysis .action-plan-list li { flex:0 0 auto; }
+ .company-analysis .action-plan-list label { height:auto; }
 }
 
 
@@ -212,3 +212,44 @@
 .company-analysis .action-plan-list .is-source-related { background:#fff4f6; }
 .company-analysis .action-plan-list .is-source-related label { background:transparent; border-radius:0; }
 .company-analysis .action-plan-list input { flex:0 0 20px; }
+
+/* API text must fit the same dashboard cards as the original short copy. */
+.risk-details-button { display:block; max-width:100%; padding:0; background:transparent; text-align:left; color:inherit; font:inherit; font-weight:inherit; }
+.risk-details-button:hover { color:var(--red); }
+.company-analysis .risk-entry-heading { padding-right:32px; min-width:0; }
+.company-analysis .risk-entry-heading > div { min-width:0; }
+.company-analysis .risk-entry h3,
+.company-analysis .risk-flow p,
+.company-analysis .action-plan-title,
+.company-analysis .opportunity-copy h3,
+.company-analysis .opportunity-copy p,
+.company-analysis .scenario-outcome p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+.company-analysis .risk-entry > .analysis-source { min-width:0; }
+.company-analysis .risk-source-label { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.company-analysis .analysis-source svg { flex-shrink:0; }
+.company-analysis .opportunity-details { border:0; background:transparent; cursor:pointer; font:inherit; font-size:11px; }
+@media (min-width:1100px) {
+ .company-analysis .analysis-workspace { min-height:0; }
+ .company-analysis .risk-register,
+ .company-analysis .action-plan { min-height:0; }
+ .company-analysis .risk-register-list { gap:12px; padding:5px; margin:-5px; }
+ .company-analysis .opportunities-widget { min-height:0; }
+ .company-analysis .opportunity-layout { align-items:start; }
+ .company-analysis .opportunity-copy { align-self:start; }
+ .company-analysis .action-plan-list li::after { bottom:-13px; }
+}
+@media (min-width:1100px) and (max-height:800px) {
+ .company-analysis > .page-header { min-height:60px; }
+ .company-analysis .opportunities-widget .opportunity-copy { padding:10px; }
+ .company-analysis .opportunity-copy p,
+ .company-analysis .scenario-outcome p { -webkit-line-clamp:2; }
+}
+
+@media (max-width:1099px) {
+ .company-analysis .analysis-workspace { grid-template-columns:minmax(0,1fr); }
+ .company-analysis .panel,
+ .company-analysis .risk-register-list,
+ .company-analysis .risk-entry,
+ .company-analysis .opportunity-copy { min-width:0; }
+ .company-analysis .risk-entry-heading { padding-right:0; }
+}

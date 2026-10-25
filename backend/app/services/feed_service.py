@@ -1,4 +1,5 @@
 from typing import List
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.db.repositories.news_repo import NewsRepository
 from backend.app.db.repositories.company_repo import CompanyRepository
@@ -12,6 +13,8 @@ class FeedService:
 
     async def get_company_feed(self, company_id: int, limit: int = 50) -> FeedResponse:
         company = await self.company_repo.get_by_id(company_id)
+        if not company:
+            raise HTTPException(status_code=404, detail="Company not found")
         articles = await self.news_repo.list_feed(limit=limit)
 
         results: List[NewsArticleResponse] = []

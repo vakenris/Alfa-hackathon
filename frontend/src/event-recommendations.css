@@ -1,0 +1,84 @@
+.analysis-risk-workspace { min-width:0; min-height:0; }
+.recommendation-workspace { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:16px; min-width:0; }
+.company-analysis .event-recommendations,
+.company-analysis .bank-products { padding:20px; min-width:0; border:1px solid #e1e7f0; border-radius:13px; background:#fff; }
+.company-analysis .event-recommendations .analysis-panel-heading,
+.company-analysis .bank-products .analysis-panel-heading { margin-bottom:16px; }
+.company-analysis .event-recommendations h2,
+.company-analysis .bank-products h2 { font-size:18px; }
+.recommendation-heading > div { min-width:0; }
+.recommendation-heading p { color:#8794a9; font-size:12px; margin-top:7px; }
+.recommendation-event-picker { display:block; max-width:35%; min-width:0; }
+.recommendation-event-picker select { width:100%; padding:7px 20px 7px 9px; border:1px solid #e5ebf2; border-radius:7px; background:#fff; font:inherit; font-size:10px; color:#7a8aa1; text-overflow:ellipsis; }
+.recommendation-list { display:grid; gap:10px; margin:0; padding:0; list-style:none; }
+.recommendation-list li { min-width:0; }
+.recommendation-card { display:grid; grid-template-columns:44px minmax(0,1fr) 18px; gap:14px; align-items:center; width:100%; padding:12px 14px; border:1px solid #e4eaf3; border-radius:10px; background:#fff; text-align:left; }
+.recommendation-card:hover { border-color:#f3bcc7; background:#fffafb; }
+.recommendation-icon { display:grid; place-items:center; width:44px; height:44px; border-radius:50%; background:#ffedf1; color:var(--red); }
+.recommendation-copy { display:grid; gap:5px; min-width:0; }
+.recommendation-copy strong { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; font-size:13px; line-height:1.35; font-weight:600; color:#182337; }
+.recommendation-copy > span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; color:#7e8ca2; font-size:11px; line-height:1.4; }
+.recommendation-card > svg { color:#8090a7; }
+.bank-product-picker { display:block; min-width:0; }
+.bank-product-picker select { width:100%; max-width:100%; padding:10px 28px 10px 12px; border:1px solid #dfe6ef; border-radius:9px; background:#fff; color:#677b97; font:inherit; font-size:11px; text-overflow:ellipsis; }
+.bank-event-scenario { display:grid; align-content:start; justify-items:start; gap:10px; border-top:1px solid #e7ecf3; margin-top:18px; padding-top:16px; }
+.bank-event-scenario h3 { font-size:13px; font-weight:500; color:#26364c; }
+.bank-event-category { display:inline-flex; padding:5px 10px; border-radius:8px; background:#f0f3f7; color:#7c8ca3; font-size:11px; }
+.bank-event-category:hover { color:var(--red); }
+.bank-scenario-details { display:grid; gap:7px; width:100%; text-align:left; padding:0; background:transparent; color:#75859d; font-size:12px; line-height:1.5; }
+.bank-scenario-details span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; overflow-wrap:anywhere; }
+.bank-scenario-details:hover { color:#465e7e; }
+.bank-next-step { display:flex; align-items:flex-start; gap:14px; width:100%; margin-top:18px; padding:16px 0 0; border-top:1px solid #e7ecf3; background:transparent; text-align:left; }
+.bank-next-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:50%; background:#ffedf1; color:var(--red); flex-shrink:0; }
+.bank-next-step > span:last-child { display:grid; gap:6px; min-width:0; }
+.bank-next-step strong { color:#23334a; font-size:12px; font-weight:600; }
+.bank-next-step > span > span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; color:#7b8ba3; font-size:11px; line-height:1.45; }
+.event-panel-empty { color:#8794a7; font-size:12px; line-height:1.5; margin-top:16px; }
+@media (min-width:1100px) {
+  .company-analysis { grid-template-rows:auto minmax(0,max-content) auto auto; }
+  .analysis-risk-workspace { display:flex; flex-direction:column; }
+  .analysis-risk-workspace > .risk-register { flex:1; min-height:0; }
+  .recommendation-workspace { align-items:stretch; }
+  .company-analysis .risk-widget .risk-action-copy { -webkit-line-clamp:3; }
+}
+@media (min-width:1100px) and (max-height:800px) {
+  .recommendation-workspace { gap:12px; }
+  .company-analysis .event-recommendations,
+  .company-analysis .bank-products { padding:12px; }
+  .company-analysis .event-recommendations h2,
+  .company-analysis .bank-products h2 { font-size:15px; }
+  .company-analysis .event-recommendations .analysis-panel-heading,
+  .company-analysis .bank-products .analysis-panel-heading { margin-bottom:10px; }
+  .recommendation-heading p { margin-top:4px; font-size:10px; }
+  .recommendation-event-picker { max-width:32%; }
+  .recommendation-list { gap:8px; }
+  .recommendation-card { padding:9px 10px; gap:10px; grid-template-columns:34px minmax(0,1fr) 16px; }
+  .recommendation-icon { width:34px; height:34px; }
+  .recommendation-icon svg { width:20px; height:20px; }
+  .recommendation-copy strong { font-size:11px; }
+  .recommendation-copy > span { font-size:10px; }
+  .bank-product-picker select { padding-block:7px; font-size:10px; }
+  .bank-event-scenario { gap:7px; margin-top:12px; padding-top:10px; }
+  .bank-event-scenario h3 { font-size:11px; }
+  .bank-event-category { font-size:10px; padding:4px 8px; }
+  .bank-scenario-details { font-size:10px; gap:5px; }
+  .bank-scenario-details span { -webkit-line-clamp:2; }
+  .bank-next-step { margin-top:12px; padding-top:10px; gap:10px; }
+  .bank-next-icon { width:30px; height:30px; }
+  .bank-next-step strong { font-size:10px; }
+  .bank-next-step > span > span { font-size:10px; }
+}
+@media (max-width:1099px) {
+  .recommendation-workspace { grid-template-columns:minmax(0,1fr); }
+}
+@media (max-width:700px) {
+  .company-analysis .event-recommendations,
+  .company-analysis .bank-products { padding:16px; }
+  .recommendation-heading { flex-wrap:wrap; }
+  .recommendation-event-picker { width:100%; max-width:100%; }
+  .recommendation-card { padding:12px; gap:10px; grid-template-columns:36px minmax(0,1fr) 16px; }
+  .recommendation-icon { width:36px; height:36px; }
+  .recommendation-copy strong { font-size:12px; }
+}
+
+.company-analysis .risk-widget .risk-entry.is-source-related { outline:none; border-color:#efbdc9; }

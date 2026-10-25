@@ -22,10 +22,7 @@ export function NewsCard({ item }: { item: NewsItem }) {
         </h3>
         <p className="news-card-summary">{item.description}</p>
         <div className="news-card-footer">
-          <Badge tone={item.impact === "high" ? "red" : "orange"}>
-            {item.impact === "high" ? "Высокое" : "Среднее"} влияние{" "}
-            <Icon name="chart" size={27} />
-          </Badge>
+          <Badge tone="red">Влияние на бизнес <Icon name="chart" size={27} /></Badge>
           <a
             className="circle-button"
             href={`#/news/${item.id}`}

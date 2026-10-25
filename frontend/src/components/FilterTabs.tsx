@@ -40,8 +40,7 @@ export function FilterTabs<T extends string>({
     event.preventDefault();
     onChange(items[next].id);
     event.currentTarget.parentElement
-      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-      [next]?.focus();
+      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   }
   return (
     <div ref={tabsRef} className="overview-tabs" role="tablist" aria-label={label}>

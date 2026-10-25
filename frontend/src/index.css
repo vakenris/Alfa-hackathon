@@ -9,6 +9,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   --red: #ff142b;
+  --navigation-inset: 25px;
   --muted: #7f8ba2;
   --border: #e7ecf2;
   --radius: 12px;

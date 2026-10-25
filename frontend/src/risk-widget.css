@@ -1,0 +1,97 @@
+/* Reference card layout, confined to the attention widget. */
+.company-analysis .risk-widget {
+  padding:20px;
+  border:1px solid #e5ebf3;
+  border-radius:18px;
+  background:#fff;
+}
+.company-analysis .risk-widget .analysis-panel-heading { margin-bottom:16px; }
+.company-analysis .risk-widget .analysis-panel-heading h2 { gap:12px; font-size:20px; letter-spacing:-.035em; }
+.company-analysis .risk-widget .analysis-panel-heading h2::before { width:4px; height:25px; }
+.company-analysis .risk-widget .risk-register-list { gap:14px; }
+.company-analysis .risk-widget .risk-entry {
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+  grid-template-rows:auto auto auto;
+  grid-template-areas:"heading heading" "consequences action" "source action";
+  align-content:start;
+  gap:12px 18px;
+  padding:16px;
+  border:1px solid #ffdae3;
+  border-radius:16px;
+  background:linear-gradient(115deg,#fff2f6,#fff6f8);
+}
+.company-analysis .risk-widget .risk-entry:nth-child(even) { background:linear-gradient(115deg,#f3f6fa,#f6f8fc); border-color:#f0f4f9; }
+.company-analysis .risk-widget .risk-entry-heading { grid-area:heading; gap:16px; padding-right:28px; margin:0; align-items:center; }
+.company-analysis .risk-widget .risk-entry-icon { width:50px; height:50px; border-radius:13px; color:var(--red); background:#ffe0e8; box-shadow:none; }
+.company-analysis .risk-widget .risk-entry:nth-child(even) .risk-entry-icon { color:#101827; background:#e2e8f0; }
+.company-analysis .risk-widget .risk-area { font-size:10px; letter-spacing:.02em; font-weight:500; margin-bottom:5px; color:#8391a8; }
+.company-analysis .risk-widget .risk-entry h3 { display:block; color:#0e1522; font-size:16px; line-height:1.25; font-weight:750; letter-spacing:-.025em; }
+.company-analysis .risk-widget .risk-details-button { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.company-analysis .risk-widget .risk-entry-index { display:block; top:17px; right:16px; margin:0; font-size:26px; font-weight:400; color:#98a6be; letter-spacing:-.05em; }
+.company-analysis .risk-widget .risk-consequences { grid-area:consequences; display:flex; flex-direction:column; gap:8px; list-style:none; padding:2px 0 0; margin:0; align-self:start; }
+.risk-consequences li { display:grid; grid-template-columns:24px minmax(0,1fr); gap:12px; align-items:start; }
+.risk-consequence-number { display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#ffe2e9; color:var(--red); font-size:12px; }
+.company-analysis .risk-widget .risk-entry:nth-child(even) .risk-consequence-number { background:#e5ebf3; color:#27364b; }
+.risk-consequence-text { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; color:#4b607e; font-size:12px; line-height:1.5; overflow-wrap:anywhere; padding-top:2px; }
+.company-analysis .risk-widget .risk-flow-action {
+  grid-area:action;
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr) 40px;
+  grid-template-rows:auto auto;
+  grid-template-areas:"light label button" ". copy button";
+  align-items:start;
+  align-content:center;
+  gap:7px 10px;
+  padding:14px;
+  border:1px solid #ffdae3;
+  border-radius:13px;
+  background:#ffffff40;
+  min-width:0;
+}
+.company-analysis .risk-widget .risk-entry:nth-child(even) .risk-flow-action { border-color:#e0e8f3; background:#ffffff30; }
+.risk-action-light { grid-area:light; color:var(--red); display:flex; align-items:center; justify-content:center; }
+.risk-action-label { grid-area:label; color:var(--red); font-size:12px; line-height:22px; font-weight:700; }
+.company-analysis .risk-widget .risk-action-copy { grid-area:copy; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; overflow:hidden; padding:0; margin:0; color:#4b607e; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.company-analysis .risk-widget .risk-action-open,
+.company-analysis .risk-widget .risk-entry:nth-child(even) .risk-action-open { grid-area:button; align-self:center; width:40px; height:40px; min-height:40px; padding:0; border:0; border-radius:12px; background:var(--red); color:white; display:grid; place-items:center; }
+.company-analysis .risk-widget .risk-action-open:hover { background:var(--red); }
+.company-analysis .risk-widget .risk-entry > .analysis-source { grid-area:source; align-self:end; margin:0; gap:10px; max-width:100%; font-size:11px; color:#899ab3; text-decoration:none; }
+.company-analysis .risk-widget .analysis-source svg { width:15px; height:15px; }
+.company-analysis .risk-widget .analysis-source:hover { color:var(--red); }
+@media (min-width:1100px) and (max-height:800px) {
+  .company-analysis .risk-widget { padding:12px; border-radius:13px; }
+  .company-analysis .risk-widget .analysis-panel-heading { margin-bottom:10px; }
+  .company-analysis .risk-widget .analysis-panel-heading h2 { font-size:16px; }
+  .company-analysis .risk-widget .analysis-panel-heading h2::before { height:20px; width:3px; }
+  .company-analysis .risk-widget .risk-register-list { gap:10px; }
+  .company-analysis .risk-widget .risk-entry { padding:11px; gap:9px 12px; border-radius:12px; }
+  .company-analysis .risk-widget .risk-entry-heading { gap:10px; }
+  .company-analysis .risk-widget .risk-entry-icon { width:34px; height:34px; border-radius:10px; }
+  .company-analysis .risk-widget .risk-entry-icon svg { width:23px; height:23px; }
+  .company-analysis .risk-widget .risk-area { font-size:9px; margin-bottom:3px; }
+  .company-analysis .risk-widget .risk-entry h3 { font-size:13px; }
+  .company-analysis .risk-widget .risk-entry-index { font-size:22px; top:11px; right:11px; }
+  .risk-consequences li { grid-template-columns:20px minmax(0,1fr); gap:8px; }
+  .risk-consequence-number { width:20px; height:20px; font-size:10px; }
+  .risk-consequence-text { font-size:10px; line-height:1.4; }
+  .company-analysis .risk-widget .risk-consequences { gap:6px; }
+  .company-analysis .risk-widget .risk-flow-action { grid-template-columns:16px minmax(0,1fr) 30px; padding:10px; gap:5px 7px; border-radius:10px; }
+  .risk-action-light svg { width:19px; height:19px; }
+  .risk-action-label { font-size:10px; line-height:19px; }
+  .company-analysis .risk-widget .risk-action-copy { font-size:10px; line-height:1.4; }
+  .company-analysis .risk-widget .risk-action-open,
+  .company-analysis .risk-widget .risk-entry:nth-child(even) .risk-action-open { width:30px; height:30px; min-height:30px; border-radius:9px; }
+  .company-analysis .risk-widget .risk-entry > .analysis-source { font-size:10px; gap:7px; }
+}
+@media (max-width:700px) {
+  .company-analysis .risk-widget { padding:16px; }
+  .company-analysis .risk-widget .analysis-panel-heading h2 { font-size:18px; }
+  .company-analysis .risk-widget .risk-entry { grid-template-columns:minmax(0,1fr); grid-template-areas:"heading" "consequences" "action" "source"; padding:14px; gap:14px; }
+  .company-analysis .risk-widget .risk-entry-icon { width:40px; height:40px; border-radius:11px; }
+  .company-analysis .risk-widget .risk-entry-heading { gap:10px; padding-right:24px; }
+  .company-analysis .risk-widget .risk-entry h3 { font-size:14px; }
+  .company-analysis .risk-widget .risk-entry-index { font-size:22px; top:13px; right:12px; }
+  .company-analysis .risk-widget .risk-flow-action { grid-template-columns:20px minmax(0,1fr) 36px; }
+  .company-analysis .risk-widget .risk-action-open { width:36px; height:36px; min-height:36px; }
+}

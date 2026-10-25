@@ -1,6 +1,6 @@
 .sidebar {
   position: fixed;
-  inset: 25px auto 25px 24px;
+  inset: var(--navigation-inset) auto var(--navigation-inset) 24px;
   width: 90px;
   background: linear-gradient(120deg, #181d23, #161c20);
   border: 1px solid #252a30;
@@ -48,7 +48,7 @@
   color: white;
 }
 .nav-link.active {
-  background: #ef1830;
+  background: var(--red);
   color: white;
 }
 .nav-label {
@@ -106,7 +106,7 @@
   flex-shrink: 0;
 }
 .tone-red {
-  color: #ff142b;
+  color: var(--red);
   background: #ffedef;
 }
 .tone-orange {
@@ -171,7 +171,7 @@
   font-size: 13px;
 }
 .primary-button {
-  background: #ef1830;
+  background: var(--red);
   color: white;
   border-radius: 8px;
   font-size: 16px;
@@ -812,7 +812,7 @@
   font-size: 14px;
 }
 .analysis-tabs button.selected {
-  background: #ff142b;
+  background: var(--red);
   color: white;
 }
 .opportunity {
@@ -1553,3 +1553,10 @@
     height: 40px;
   }
 }
+
+.api-text { white-space: pre-line; overflow-wrap: anywhere; }
+
+
+.sources-list .source-reference { display:flex; align-items:center; gap:12px; text-align:left; color:inherit; background:transparent; border:0; padding:0; cursor:pointer; font:inherit; }
+.sources-list .source-reference > span:nth-child(2) { display:grid; gap:4px; }
+.sources-list .source-reference small { color:var(--muted, #8390a3); }

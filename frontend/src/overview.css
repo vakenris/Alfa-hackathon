@@ -51,7 +51,7 @@
 }
 .overview-tabs button[aria-selected="true"] .overview-tab-count {
   background: #ffeaed;
-  color: #d5213a;
+  color: var(--red);
 }
 .overview-content {
   min-width: 0;
@@ -199,4 +199,55 @@
 .overview-tabs button::after { display: none; }
 @media (prefers-reduced-motion: reduce) {
  .overview-tabs::after { transition: none; }
+}
+
+/* Keep API feeds of any length in the original single-row carousel. */
+.home-page .news-grid:not(.news-grid--single) {
+  display:grid;
+  grid-template-columns:none;
+  grid-auto-flow:column;
+  grid-auto-columns:calc((100% - 40px) / 3);
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scroll-snap-type:x mandatory;
+  scroll-padding-inline:0;
+  scrollbar-width:none;
+  padding-bottom:0;
+  min-width:0;
+}
+.home-page .news-grid:not(.news-grid--single)::-webkit-scrollbar { display:none; }
+.home-page .news-grid .news-card { scroll-snap-align:start; }
+.home-page .news-grid:focus-visible { outline:2px solid #b2bbca; outline-offset:3px; border-radius:12px; }
+@media (min-width:1100px) {
+  .home-page { grid-template-rows:auto auto; align-content:start; }
+  .home-page .news-section { min-height:0; grid-template-rows:auto auto; align-content:start; }
+  .home-page .overview-content,
+  .home-page .news-carousel { min-height:0; min-width:0; }
+  .home-page .overview-content > .news-carousel { height:auto; grid-template-columns:minmax(0,1fr); }
+  .home-page .news-grid:not(.news-grid--single) { height:auto; grid-template-rows:clamp(140px,20dvh,180px) auto; }
+  .home-page .news-grid:not(.news-grid--single) .news-image-link { height:100%; }
+  .home-page .news-grid:not(.news-grid--single) .news-image { height:100%; min-height:0; }
+  .home-page .news-card h3,
+  .home-page .news-card-summary { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; }
+  .home-page .news-card h3 { overflow-wrap:anywhere; }
+  .home-page .news-grid:not(.news-grid--single) .news-card { grid-row:span 2; grid-template-rows:subgrid; }
+  .home-page .carousel-prev,
+  .home-page .carousel-next { top:50%; transform:translateY(-50%); }
+}
+@media (max-width:1450px) and (min-width:1100px) {
+  .home-page .news-grid:not(.news-grid--single) { grid-auto-columns:calc((100% - 24px) / 3); }
+}
+@media (max-width:1099px) and (min-width:701px) {
+  .home-page .news-grid:not(.news-grid--single) { grid-auto-columns:calc((100% - 20px) / 2); grid-template-rows:auto; }
+}
+@media (max-width:700px) {
+  .home-page .news-grid:not(.news-grid--single) { grid-auto-columns:100%; grid-template-rows:auto; }
+  .home-page .news-card { grid-row:auto; }
+}
+
+@media (min-width:1100px) and (max-height:800px) {
+  .home-page { gap:14px; }
+  .home-page .news-grid:not(.news-grid--single) { grid-template-rows:110px auto; }
+  .home-page .news-card-summary { display:none; }
+  .home-page .news-card h3 { -webkit-line-clamp:2; min-height:0; margin-block:9px; }
 }

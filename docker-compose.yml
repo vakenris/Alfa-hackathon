@@ -53,7 +53,9 @@ services:
       - "8000"
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: alfa_nginx
     restart: always
     depends_on:

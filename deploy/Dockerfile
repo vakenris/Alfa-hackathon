@@ -39,10 +39,6 @@ COPY --from=builder /install /usr/local
 # Copy application source
 COPY backend/ ./backend/
 
-# Copy data directory only if it exists (optional — may not be present in CI)
-# Using a wildcard so Docker doesn't fail when the directory is absent
-COPY data* ./data/
-
 # Environment
 ENV PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \

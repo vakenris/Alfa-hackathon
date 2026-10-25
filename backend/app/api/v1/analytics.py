@@ -17,6 +17,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
+from backend.app.db.models.agent_trace import JobRecord
+from backend.app.schemas.insight import InsightResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.api.deps import get_db, get_current_user_role, UserRole
@@ -255,4 +258,47 @@ async def get_counterparty_exposure(
         total_incoming_rub=total_incoming,
         net_flow_rub=total_incoming - total_outgoing,
         counterparties=counterparties,
+    )
+
+
+class AutomaticAnalysisJob(BaseModel):
+    event_id: int
+    status: str
+    error_message: Optional[str] = None
+
+
+class AutomaticAnalysisSnapshot(BaseModel):
+    items: List[InsightResponse]
+    jobs: List[AutomaticAnalysisJob]
+
+
+@router.get("/{company_id}/analytics/automatic-insights", response_model=AutomaticAnalysisSnapshot)
+async def get_automatic_insights(
+    company_id: int,
+    db: AsyncSession = Depends(get_db),
+    role: UserRole = Depends(get_current_user_role),
+):
+    """One snapshot for article details, company analytics, and background progress."""
+    if not await CompanyRepository(db).get_by_id(company_id):
+        raise HTTPException(status_code=404, detail="Company not found")
+    event_ids = (await db.execute(select(NewsArticle.id))).scalars().all()
+    result = await db.execute(select(Insight).where(Insight.company_id == company_id)
+                              .options(selectinload(Insight.evidences)).order_by(Insight.id.desc()))
+    insights = {}
+    for insight in result.scalars().all():
+        insights.setdefault(insight.event_id, insight)
+    result = await db.execute(select(JobRecord).where(JobRecord.company_id == company_id)
+                              .order_by(JobRecord.created_at.desc()))
+    latest_jobs = {}
+    for job in result.scalars().all():
+        latest_jobs.setdefault(job.event_id, job)
+    statuses = []
+    for event_id in event_ids:
+        job = latest_jobs.get(event_id)
+        status = "SUCCESS" if event_id in insights else job.status if job else "PENDING"
+        statuses.append(AutomaticAnalysisJob(event_id=event_id, status=status,
+                         error_message=job.error_message if job and status == "FAILED" else None))
+    return AutomaticAnalysisSnapshot(
+        items=[InsightResponse.model_validate(insight) for event_id, insight in insights.items() if event_id in event_ids],
+        jobs=statuses,
     )

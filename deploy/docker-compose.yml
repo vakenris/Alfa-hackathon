@@ -73,7 +73,8 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - ../.env        # optional: overrides below; ignored if file missing
+      - path: ../.env
+        required: false
     environment:
       # Database
       DATABASE_URL: postgresql+asyncpg://alfa_user:alfa_password@postgres:5432/alfa_analytics
@@ -108,7 +109,9 @@ services:
   # Nginx reverse proxy
   # ---------------------------------------------------------------------------
   nginx:
-    image: nginx:1.27-alpine
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
     container_name: alfa_nginx
     restart: always
     depends_on:

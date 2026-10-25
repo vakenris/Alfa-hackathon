@@ -31,3 +31,6 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["backend/tests"]
+
+[tool.setuptools.packages.find]
+include = ["backend*"]

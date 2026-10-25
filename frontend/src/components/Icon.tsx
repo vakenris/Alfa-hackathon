@@ -2,6 +2,9 @@ export type IconName =
   | "home"
   | "chart"
   | "user"
+  | "check"
+  | "document"
+  | "truck"
   | "building"
   | "briefcase"
   | "down"
@@ -25,6 +28,9 @@ const paths: Record<IconName, string> = {
   home: "m3 10 9-7 9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V13h3v7zm7 0V8h3v12zm7 0V3h3v17z",
   user: "M20 21v-2a8 8 0 0 0-16 0v2ZM16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0",
+  check: "m5 12 4 4 10-10",
+  document: "M6 3h9l4 4v14H6ZM14 3v5h5M9 12h7M9 16h7",
+  truck: "M3 17V5a2 2 0 0 1 2-2h10v14M15 8h4l3 4v5h-2M8 17h7M8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0M20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0",
   building:
     "M5 21V3h14v18ZM9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01M11 21v-3h2v3",
   briefcase: "M3 7h18v14H3ZM8 7V3h8v4M3 11l9 4 9-4",

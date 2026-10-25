@@ -85,7 +85,7 @@
   color: #a1aaba;
 }
 .analysis-priority {
-  color: #cc3246;
+  color: var(--red);
   background: #fff0f2;
   font-size: 10px;
   padding: 5px 8px;
@@ -132,7 +132,7 @@
 }
 .risk-action svg {
   margin-top: 1px;
-  color: #d52b40;
+  color: var(--red);
 }
 .analysis-source {
   display: inline-flex;
@@ -168,7 +168,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  accent-color: #ed1730;
+  accent-color: var(--red);
   cursor: pointer;
 }
 .action-plan-title {
@@ -397,7 +397,7 @@
   margin-right: 3px;
 }
 .analysis-summary > span:first-child > svg {
-  color: #e22a41;
+  color: var(--red);
 }
 .risk-register-list {
   gap: 18px;
@@ -413,7 +413,7 @@
   height: 36px;
   flex-shrink: 0;
   border-radius: 10px;
-  color: #dc2940;
+  color: var(--red);
   background: #fff0f2;
 }
 .risk-entry-heading > div {
@@ -448,7 +448,7 @@
 }
 .risk-flow-action {
   background: #fff4f5;
-  border-left: 2px solid #e83249;
+  border-left: 2px solid var(--red);
 }
 .risk-flow-label {
   display: block;
@@ -457,7 +457,7 @@
   margin-bottom: 5px;
 }
 .risk-flow-action .risk-flow-label {
-  color: #d93a4e;
+  color: var(--red);
 }
 .risk-flow p {
   color: #45546a;
@@ -500,7 +500,7 @@
   stroke: #edf0f5;
 }
 .plan-ring-value {
-  stroke: #ed243e;
+  stroke: var(--red);
   stroke-linecap: round;
   transition: stroke-dashoffset 0.2s;
 }
@@ -554,11 +554,11 @@
   background: #fff;
 }
 .action-plan-list input:hover {
-  border-color: #ec2941;
+  border-color: var(--red);
 }
 .action-plan-list input:checked {
-  border-color: #ed243e;
-  background: #ed243e
+  border-color: var(--red);
+  background: var(--red)
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 10 3 3 7-7'/%3E%3C/svg%3E")
     center/18px no-repeat;
 }
@@ -598,7 +598,7 @@
 }
 .scenario-switch button[aria-pressed="true"] {
   background: #fff;
-  color: #d72c43;
+  color: var(--red);
   box-shadow: 0 1px 5px #26374b0a;
 }
 .scenario-outcome {
@@ -786,7 +786,7 @@
   width: 3px;
   height: 22px;
   border-radius: 2px;
-  background: #f0223e;
+  background: var(--red);
 }
 .company-analysis .analysis-opportunity .analysis-panel-heading h2::before {
   background: #aeb8c6;
@@ -819,7 +819,7 @@
   padding: 12px 16px;
   border-radius: 11px;
   background: #ffebee;
-  color: #d4223b;
+  color: var(--red);
   font-size: 12px;
   font-weight: 500;
 }
@@ -903,7 +903,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #e42943;
+  color: var(--red);
   font-size: 11px;
   font-weight: 600;
   margin-bottom: 6px;
@@ -919,11 +919,11 @@
   place-items: center;
   flex-shrink: 0;
   border-radius: 11px;
-  background: #f0203b;
+  background: var(--red);
   color: #fff;
 }
 .risk-action-open:hover {
-  background: #d71831;
+  background: var(--red);
 }
 .risk-entry .analysis-source {
   color: #7b899d;
@@ -956,7 +956,7 @@
   color: #98a5b7;
 }
 .action-plan-source:hover {
-  color: #d8233b;
+  color: var(--red);
 }
 .company-analysis .analysis-opportunity {
   background: #fff;
