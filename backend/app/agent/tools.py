@@ -29,6 +29,11 @@ class MockAnalyticsSource:
     def __init__(self, documents: list[AnalyticsDocument] | None = None):
         self._documents = list(documents or [])
 
+    @property
+    def search_available(self) -> bool:
+        """An empty fixed fixture has nothing to retrieve, independent of query."""
+        return bool(self._documents)
+
     async def search(
         self, query: str, *, company: CompanyResponse, event: NewsArticleResponse, limit: int,
     ) -> list[AnalyticsDocument]:
@@ -86,10 +91,18 @@ async def execute_tool(
                 if any(not item.article.is_bank_analytics for item in validated):
                     return failure("INVALID_TOOL_RESULT")
                 data = {"documents": [item.model_dump(mode="json") for item in validated]}
+                coverage = getattr(source, "coverage", None)
+                if config.analysis_mode == "grounded" and isinstance(coverage, str):
+                    candidate_limit = getattr(source, "candidate_limit", None)
+                    data["retrieval"] = {
+                        "coverage": coverage[:80],
+                        "candidate_limit": candidate_limit if type(candidate_limit) is int and 1 <= candidate_limit <= 50 else None,
+                        "exhaustive": False,
+                    }
             else:
                 directions: dict[str, dict[str, float | int]] = {}
                 for item in counterparties:
-                    if not math.isfinite(item.total_amount):
+                    if not math.isfinite(item.total_amount) or item.total_amount < 0 or item.transaction_count < 0:
                         return failure("INVALID_TOOL_RESULT")
                     group = directions.setdefault(
                         item.direction, {"count": 0, "total_amount": 0.0, "transaction_count": 0},

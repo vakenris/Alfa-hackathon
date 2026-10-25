@@ -80,7 +80,17 @@ class ChatCompletionsClient:
                     trust_env=False,
                     transport=self._transport,
                 ) as client:
-                    response = await client.post(self.config.api_url, headers=headers, json=payload)
+                    async with client.stream("POST", self.config.api_url, headers=headers, json=payload) as response:
+                        if not response.is_success:
+                            raise LLMHTTPError(response.status_code)
+                        body = bytearray()
+                        async for chunk in response.aiter_bytes():
+                            if len(body) + len(chunk) > self.config.max_http_response_bytes:
+                                raise LLMResponseError("LLM API response exceeds the byte limit")
+                            body.extend(chunk)
+                        # Parse a bounded body; a provider cannot force an unbounded
+                        # read before the orchestrator's character limit is checked.
+                        bounded_response = httpx.Response(response.status_code, content=bytes(body))
         except httpx.TimeoutException as error:
             # Classify only known local types; never use provider/exception text.
             timeout_kind = "http_timeout"
@@ -100,10 +110,8 @@ class ChatCompletionsClient:
         except httpx.RequestError:
             raise LLMTransportError("LLM API transport failed") from None
 
-        if not response.is_success:
-            raise LLMHTTPError(response.status_code)
         try:
-            data = response.json()
+            data = bounded_response.json()
         except ValueError:
             raise LLMResponseError("LLM API response is not JSON") from None
         if not isinstance(data, dict):

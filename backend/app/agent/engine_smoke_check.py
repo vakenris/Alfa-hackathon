@@ -28,7 +28,7 @@ from .models import (
     AgentError, AgentEvidenceError, AgentLLMError, AgentLLMTimeoutError,
     AgentResponseError, AgentTimeoutError, AnalyticsDocument, ToolAction,
 )
-from .orchestrator import AgentInsightEngine
+from .orchestrator import CompatibilityInsightEngine as AgentInsightEngine
 from .prompts import COMPACT_FINALIZATION_RULES
 from .smoke_check import API_URL, MODEL
 from .tools import MockAnalyticsSource

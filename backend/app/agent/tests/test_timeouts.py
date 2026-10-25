@@ -16,7 +16,7 @@ from backend.app.agent.engine_smoke_check import (
     BoundedSmokeClient, engine_smoke_config, main, make_scenario, mock_final_result, run_check,
 )
 from backend.app.agent.models import AgentLLMError, AgentLLMTimeoutError
-from backend.app.agent.orchestrator import AgentInsightEngine
+from backend.app.agent.orchestrator import CompatibilityInsightEngine as AgentInsightEngine
 
 
 MODULE = "backend.app.agent.engine_smoke_check"

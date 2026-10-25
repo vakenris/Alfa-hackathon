@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 from pydantic import ValidationError
 
 from backend.app.agent import (
-    AgentConfig, AgentInsightEngine, AnalyticsDocument, FakeLLMClient,
+    AgentConfig, CompatibilityInsightEngine as AgentInsightEngine, AnalyticsDocument, FakeLLMClient,
     MockAnalyticsSource, RecordingTracer,
 )
 from backend.app.agent.context import json_text

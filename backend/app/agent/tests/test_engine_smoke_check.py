@@ -18,7 +18,7 @@ from backend.app.agent.engine_smoke_check import (
     engine_smoke_config, main, make_scenario, mock_final_result, run_check,
 )
 from backend.app.agent.models import BANK_VIEW_UNAVAILABLE
-from backend.app.agent.orchestrator import AgentInsightEngine
+from backend.app.agent.orchestrator import CompatibilityInsightEngine as AgentInsightEngine
 from backend.app.agent.prompts import COMPACT_FINALIZATION_RULES
 from backend.app.ml.interface import MLInsightResult
 

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import httpx
 from pydantic import ValidationError
 
-from backend.app.agent import AgentInsightEngine, FakeLLMClient, LLMClientProtocol, RecordingTracer
+from backend.app.agent import CompatibilityInsightEngine as AgentInsightEngine, FakeLLMClient, LLMClientProtocol, RecordingTracer
 from backend.app.agent.api_client import (
     ChatCompletionsClient,
     LLMHTTPError,

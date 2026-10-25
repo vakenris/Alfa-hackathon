@@ -33,11 +33,15 @@ class AgentInsightEngine:
         self.llm_client = llm_client if llm_client is not None else FakeLLMClient()
         self.analytics_source = analytics_source if analytics_source is not None else MockAnalyticsSource()
         self.config = config if config is not None else AgentConfig()
+        self._implicit_client = llm_client is None
+        self._llm_lock = asyncio.Lock()
 
     async def generate_insight(
         self, company: CompanyResponse, event: NewsArticleResponse,
         counterparties: List[CounterpartyItem], tracer: AgentTracerProtocol,
     ) -> MLInsightResult:
+        if self.config.analysis_mode == "grounded":
+            return (await self.generate_analysis(company, event, counterparties, tracer)).insight
         try:
             async with asyncio.timeout(self.config.run_timeout_seconds) as deadline:
                 return await self._run(company, event, counterparties, tracer)
@@ -46,6 +50,33 @@ class AgentInsightEngine:
                 raise
             await tracer.emit_step("Ошибка времени", "Превышен общий timeout запуска агента.")
             raise AgentTimeoutError("Превышен общий timeout запуска агента.") from None
+
+    async def generate_analysis(self, company, event, counterparties, tracer):
+        """Grounded companion result; never stores a report or sources on a shared engine."""
+        from .grounded import run_grounded
+        from .models import AgentConfigurationError, AgentError
+        from .runtime import RunTelemetry
+
+        if self.config.analysis_mode != "grounded" or self._implicit_client:
+            raise AgentConfigurationError("GROUNDED_REQUIRES_EXPLICIT_CLIENT")
+        telemetry = RunTelemetry(max_calls=min(self.config.max_steps, self.config.max_llm_calls))
+        try:
+            async with asyncio.timeout(self.config.run_timeout_seconds) as deadline:
+                return await run_grounded(self, company, event, counterparties, tracer, telemetry)
+        except TimeoutError:
+            if not deadline.expired():
+                raise
+            telemetry.record_deadline("run_deadline")
+            error = AgentTimeoutError("RUN_DEADLINE")
+            error.run_report = telemetry.build_report().model_dump(mode="json")
+            raise error from None
+        except AgentError as error:
+            error.run_report = telemetry.build_report().model_dump(mode="json")
+            raise
+        except asyncio.CancelledError as error:
+            # Let the caller inspect safe usage even when it cancels a job.
+            error.run_report = telemetry.build_report().model_dump(mode="json")
+            raise
 
     async def _run(
         self, company: CompanyResponse, event: NewsArticleResponse,
@@ -165,3 +196,15 @@ class AgentInsightEngine:
                 await tracer.emit_step("Результат инструмента", f"Результат {decision.tool} добавлен в контекст.")
 
         raise AgentResponseError("Лимит шагов исчерпан без итогового MLInsightResult.")
+
+
+class CompatibilityInsightEngine(AgentInsightEngine):
+    """Explicit old JSON/provenance behavior for regression fixtures and transport smoke only.
+
+    Not the grounded production path. The ordinary AgentInsightEngine defaults
+    to grounded validation; RuntimeAgentEngine rejects compatible mode.
+    """
+
+    def __init__(self, llm_client=None, *, analytics_source=None, config=None):
+        legacy_config = (config or AgentConfig()).model_copy(update={"analysis_mode": "compatible"})
+        super().__init__(llm_client, analytics_source=analytics_source, config=legacy_config)

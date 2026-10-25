@@ -2,7 +2,7 @@ import json
 import unittest
 from datetime import datetime, timezone
 
-from backend.app.agent import AgentInsightEngine, FakeLLMClient, RecordingTracer
+from backend.app.agent import CompatibilityInsightEngine as AgentInsightEngine, FakeLLMClient, RecordingTracer
 from backend.app.agent.models import ACTION_ADAPTER, AgentResponseError
 from backend.app.ml.interface import (
     AgentTracerProtocol,

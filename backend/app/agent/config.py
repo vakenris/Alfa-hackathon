@@ -13,6 +13,7 @@ class AgentConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
+    analysis_mode: Literal["grounded", "compatible"] = "grounded"
     max_steps: int = Field(default=4, ge=1, le=16, strict=True)
     max_llm_calls: int = Field(default=4, ge=1, le=16, strict=True)
     max_tool_calls: int = Field(default=3, ge=0, le=16, strict=True)
@@ -24,6 +25,9 @@ class AgentConfig(BaseModel):
     max_response_chars: int = Field(default=24_000, ge=512, strict=True)
     max_article_chars: int = Field(default=4_000, ge=64, strict=True)
     max_counterparties: int = Field(default=50, ge=1, le=100, strict=True)
+    max_prompt_chars: int = Field(default=64_000, ge=4096, strict=True)
+    max_recovery_attempts: int = Field(default=1, ge=0, le=1, strict=True)
+    trace_timeout_seconds: float = Field(default=2, gt=0, allow_inf_nan=False)
 
 
 class ChatCompletionsConfig(BaseModel):
@@ -34,7 +38,8 @@ class ChatCompletionsConfig(BaseModel):
     auth_header: str | None = None
     auth_value: SecretStr | None = None
     timeout_seconds: float = Field(default=30.0, gt=0, allow_inf_nan=False)
-    max_output_tokens: int = Field(default=1024, gt=0)
+    max_output_tokens: int = Field(default=1024, gt=0, le=16384)
+    max_http_response_bytes: int = Field(default=256_000, ge=1024, le=2_000_000, strict=True)
     token_limit_field: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
 
     @field_validator("api_url")
