@@ -11,6 +11,7 @@ from backend.app.db.models.agent_trace import (
 )
 from backend.app.db.models.audit import AuditLog
 from backend.app.db.models.bank_document import BankDocument, BankDocumentPage
+from backend.app.db.models.person_link import PersonCompanyLink, PersonLinkImport
 
 
 __all__ = [
@@ -25,4 +26,6 @@ __all__ = [
     "AuditLog",
     "BankDocument",
     "BankDocumentPage",
+    "PersonCompanyLink",
+    "PersonLinkImport",
 ]

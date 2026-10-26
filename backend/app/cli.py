@@ -15,6 +15,7 @@ from backend.app.ingestion.analytics import read_analytics, save_analytics
 from backend.app.ingestion.analytics_source import BankPdfAnalyticsSource
 from backend.app.ingestion.companies import read_companies_csv, save_companies
 from backend.app.ingestion.payments import check_payments, import_payments
+from backend.app.ingestion.person_links import read_person_links, import_person_links
 from backend.app.ingestion.seeder import seed_data
 
 
@@ -100,6 +101,14 @@ async def run_command(args: argparse.Namespace) -> None:
                         session, args.payments, args.exclude_company
                     )
 
+        elif args.command == "ingest-links":
+            if args.dry_run:
+                _, report = read_person_links(args.links)
+            else:
+                await init_db()
+                async with async_session_factory() as session:
+                    report = await import_person_links(session, args.links)
+
         elif args.command == "ingest-analytics":
             documents, report = read_analytics(
                 args.manifest, args.pdf_dir, args.extracted_dir
@@ -140,6 +149,10 @@ def main() -> None:
     payments.add_argument(
         "--dry-run", action="store_true", help="Проверить CSV без записи в БД"
     )
+
+    links = commands.add_parser("ingest-links", help="Загрузить связи физлиц и компаний")
+    links.add_argument("--links", required=True, type=Path)
+    links.add_argument("--dry-run", action="store_true", help="Проверить CSV без записи в БД")
 
     analytics = commands.add_parser(
         "ingest-analytics", help="Загрузить текст банковских PDF"
