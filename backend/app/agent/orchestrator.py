@@ -174,7 +174,7 @@ class AgentInsightEngine:
                     error.verification=verification.model_dump(mode='json')
                     raise error
                 report=telemetry.build_report().model_dump(mode='json')
-                report.update(architecture='bounded_agent_v2',company_synthetic_u=company.synthetic_u,event_id=event.id,
+                report.update(architecture='bounded_agent_v2',projection_version=2,company_synthetic_u=company.synthetic_u,event_id=event.id,
                               plan=plan,tool_observations=observations,adaptations=adaptations)
                 report['validation_summary']={'passed':True,'impacts':len(draft.impacts),'facts':verification.checked_facts,
                                               'repairs':sum(item['action'] in ('targeted_correction','format_correction') for item in adaptations),

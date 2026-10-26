@@ -181,7 +181,15 @@ def _payments(company: CompanyResponse, rows: list[CounterpartyItem]) -> tuple[d
                 "unique_counterparties": len(items),
             }
             if direction != "self_transfer":
-                for item in sorted(items, key=lambda value: (-value["total_amount"], value["synthetic_u"]))[:3]:
+                largest = sorted(items, key=lambda value: (-value["total_amount"], value["synthetic_u"]))[:3]
+                if direction in ("incoming", "outgoing"):
+                    largest_amount = math.fsum(item["total_amount"] for item in largest)
+                    totals[direction]["largest_group"] = {
+                        "counterparties": len(largest), "total_amount": largest_amount,
+                        "share_of_passed_direction_amount": largest_amount / amount if amount else None,
+                        "synthetic_us": [item["synthetic_u"] for item in largest],
+                    }
+                for item in largest:
                     digest = hashlib.sha256(item["synthetic_u"].encode()).hexdigest()[:16]
                     top.append((f"payments:{direction}:{digest}", {
                         **item, "share_of_passed_direction_amount": item["total_amount"] / amount if amount else None,

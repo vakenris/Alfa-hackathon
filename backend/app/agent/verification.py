@@ -8,6 +8,7 @@ from backend.app.schemas.insight import EvidenceItem
 from .planning import supports_causal_channel
 
 CONDITION = re.compile(r'^(?:если\b|при условии\b|в случае\b)',re.I)
+CONDITION_CONTINUATION = re.compile(r'^\s*(?:(?:а|и|или)\s+|если\b|при условии\b|в случае\b)',re.I)
 MODAL = re.compile(r'может|могут|возмож|зависит|зависеть',re.I)
 COMPLETED = re.compile(
     r'\b(?:полученн\w*|выданн\w*|предоставленн\w*|привлеч[её]нн\w*|заключ[её]нн\w*|'
@@ -43,37 +44,154 @@ WRITTEN_QUANTITY = re.compile(
     r'\s+(?:[\w-]+\s+){0,2}(?:процент\w*|пункт\w*|рубл\w*|доллар\w*|юан\w*|евро|'
     r'тысяч\w*|миллион\w*|миллиард\w*|лет|год\w*|месяц\w*|дней|дня)\b|'
     r'\bполпроцент\w*|\b(?:одно|двух|тр[её]х|пяти|десяти)процент\w*',re.I)
-def completed_assertion(text):
+EXPECTATION_COMPARISON = re.compile(
+    r'(?:выше|ниже|дороже|дешевле|хуже|лучше)[^.!?;]{0,45}ожидани\w*', re.I)
+HOLD_INCREASE = re.compile(
+    r'сохранени\w*\s+(?:ключев\w*\s+)?ставк\w*[^.!?;]{0,65}'
+    r'(?P<effect>повыс\w*|повыш\w*|увелич\w*|удорож\w*|ухудш\w*)[^.!?;]{0,45}'
+    r'(?:расход\w*|стоимост\w*|услови\w*\s+(?:кредит|финансир)\w*)', re.I)
+PAYMENT_CONCLUSION = re.compile(
+    r'(?:концентраци\w*|плат[её]ж\w*|выборк\w*)[^.!?;]{0,80}'
+    r'(?P<verb>доказыва\w*|подтвержда\w*)[^.!?;]{0,65}'
+    r'(?:дефицит\w*|кассов\w*\s+разрыв\w*|неплат[её]ж\w*|зависимост\w*)', re.I)
+
+FINANCIAL_MARKER = re.compile(r'плавающ\w*|фиксированн\w*|остаток\s+долга', re.I)
+# These frames describe missing evidence, not absence of debt. Their scope is
+# local to a marker; a following statement never inherits a paragraph exemption.
+SCOPE_BOUNDARY = re.compile(r'[.!?;:\n]|\b(?:но|однако|зато)\b|,\s*(?:а|и)\b', re.I)
+NEGATIVE_EVIDENCE = re.compile(
+    r'\bне\s+(?:подтвержда\w*|доказыва\w*|означа\w*|определя\w*|устанавлива\w*)\b', re.I)
+UNKNOWN_EVIDENCE = re.compile(
+    r'\b(?:неизвест\w*|не\s+(?:извест\w*|установлен\w*|подтвержд[её]н\w*)|'
+    r'(?:нет|отсутствуют)\s+(?:данных|сведений|информации))\b', re.I)
+FINANCIAL_PREDICATE = re.compile(
+    r'\b(?:есть|имеется|имеются|составля\w*|равен|равна|равно|равны|действует|действуют|'
+    r'применяется|применяются|обслужива\w*|погаша\w*|влия\w*|завис\w*|может|могут|будет|будут)\b', re.I)
+
+
+def issue_excerpt(text, span=None):
+    """Keep the offending match visible even in a long mechanism; bounded UI text."""
+    if span is None or len(text)<=160:
+        return text[:160] or None
+    start,end=span
+    window=max(0,min(start-48,len(text)-160))
+    if end>window+160:
+        window=max(0,end-160)
+    return text[window:window+160]
+
+
+def financial_marker_is_unknown(text, match):
+    """Bounded grammatical heuristic, not a proof of a financial relationship.
+
+    Explicit facts, quantities and source attribution are checked independently.
+    In particular, a product disclaimer cannot legitimize a later asserted debt.
+    """
+    boundaries=list(SCOPE_BOUNDARY.finditer(text,0,match.start()))
+    start=boundaries[-1].end() if boundaries else 0
+    following=SCOPE_BOUNDARY.search(text,match.end())
+    end=following.start() if following else len(text)
+    prefix=text[start:match.start()]
+    suffix=text[match.end():end]
+    # A question stops at any comma: unlike a list of disclaimer objects, its
+    # following clause may make a new factual assertion.
+    if re.search(r'\b(?:есть|имеется|имеются)\s+ли\b[^,]*$',prefix,re.I):
+        return True
+    # Unknown/negative evidence may enumerate objects across commas. An
+    # independent coordinated predicate terminates that list even without a
+    # comma ("не подтверждает долг и остаток долга влияет на расходы").
+    request=PREPARE.search(prefix.lstrip()) or ANALYTIC_NOUN.search(prefix.lstrip())
+    frame=list(NEGATIVE_EVIDENCE.finditer(prefix))+list(UNKNOWN_EVIDENCE.finditer(prefix))
+    if request:
+        # Preserve offsets if the local clause starts with whitespace.
+        offset=len(prefix)-len(prefix.lstrip())
+        tail=prefix[offset+request.end():]
+    else:
+        tail=None
+    if frame:
+        last=max(frame,key=lambda item:item.start())
+        tail=prefix[last.end():]
+    if tail is not None:
+        coordinated=re.search(r'\bи\s+(?!ли\b)',tail,re.I)
+        # A relative clause after the list ("которые могут ...") does not
+        # establish a financial condition that the list explicitly calls unknown.
+        new_predicate=coordinated and FINANCIAL_PREDICATE.search(
+            tail[coordinated.end():]+match.group()+suffix.split(',',1)[0])
+        # A predicate attached to a new subject after a comma is another
+        # assertion, not a comma-separated object of "не подтверждает".
+        comma_predicate=',' in tail and FINANCIAL_PREDICATE.search(suffix.split(',',1)[0])
+        if not new_predicate and not comma_predicate:
+            return True
+    # "Остаток долга неизвестен" is locally unasserted; unknownness elsewhere
+    # in the sentence does not suppress an assertion about this marker.
+    if re.match(r'\s+(?:ставк\w*\s+)?(?:компании\s+)?(?:неизвест\w*|не\s+(?:извест\w*|установлен\w*|подтвержд[её]н\w*))\b',suffix,re.I):
+        return True
+    return False
+
+
+def unsupported_hold_baseline(text, event, assumption=''):
+    """Catch specific invented comparisons; not a semantic economic verifier."""
+    if not (re.search(r'ставк', event, re.I) and re.search(r'сохран|без изменен|не измен', event, re.I)):
+        return False
+    # An expressly hypothetical planning expectation is a comparison base, not
+    # an assertion that the company or the market actually expected a decline.
+    hypothetical_expectation = bool(CONDITION.search(assumption) and re.search(
+        r'ожидани\w*|залож\w*[^.;!?]{0,60}(?:снижен|повышен)', assumption, re.I))
+    increase=any(not re.search(r'\bне\s+(?:означает|доказывает|влеч[её]т|вед[её]т\s+к)\s*'
+                              r'(?:(?:автоматическ\w*|немедленн\w*)\s+)*$|\bне\s+(?:может\s+)?$',
+                              text[match.start():match.start('effect')],re.I)
+                 for match in HOLD_INCREASE.finditer(text))
+    return bool(increase or (
+        EXPECTATION_COMPARISON.search(text) and not hypothetical_expectation))
+def completed_assertion_match(text):
     for match in COMPLETED.finditer(text):
         if re.search(r'(?:может|могут)\s+быть\s*$',text[:match.start()],re.I):
             continue
         if re.match(r'(?:полученн|предоставленн)',match.group(),re.I) and re.match(
             r'\s+(?:(?:банковск|локальн|исходн|учебн|синтетическ)\w*\s+)?(?:сценари|источник|материал|анализ|данн|прогноз)\w*\b',text[match.end():],re.I):
             continue
-        return True
-    return False
+        return match
+    return None
+
+
+def completed_assertion(text):
+    return completed_assertion_match(text) is not None
 
 
 def verify_draft(draft, context):
+    """Check references separately from bounded prose heuristics.
+
+    JSON shape/types/lengths are enforced by decode_response and DraftInsight.
+    Evidence membership and provenance stay in the Python-owned registry;
+    grammar/relevance guards below cannot prove economic causality. A passing
+    result therefore keeps SEMANTIC_EXPERT_REVIEW_REQUIRED.
+    """
     issues=[]
-    def fail(code,path,text='',claim=None):
-        issues.append(CheckIssue(code=code,claim_id=claim,path=path,excerpt=text[:160] or None))
-    def text_guard(text,path,*,premise=False,condition=False,financial=False,analytical_title=False):
-        if WRITTEN_QUANTITY.search(text) or re.search(r'\d|вдвое|втрое|удво|утро|на\s+(?:половину|треть|четверть)|\b(?:тысяч\w*|миллион\w*|миллиард\w*)\b',text,re.I):
-            fail('UNSUPPORTED_INFERENCE_NUMBER',path,text)
-        if CONFIDENT.search(text): fail('FALSE_CERTAINTY',path,text)
-        if BANK_POSITION.search(text): fail('UNSUPPORTED_BANK_ATTRIBUTION',path,text)
-        if premise and (completed_assertion(text) or ASSERTION.search(text)):
-            fail('UNSUPPORTED_FACTUAL_PREMISE',path,text)
+    def fail(code,path,text='',claim=None,span=None):
+        issues.append(CheckIssue(code=code,claim_id=claim,path=path,excerpt=issue_excerpt(text,span)))
+    def text_guard(text,path,*,premise=False,condition=False,financial=False,assumption=''):
+        quantity=WRITTEN_QUANTITY.search(text) or re.search(r'\d|вдвое|втрое|удво|утро|на\s+(?:половину|треть|четверть)|\b(?:тысяч\w*|миллион\w*|миллиард\w*)\b',text,re.I)
+        if quantity:
+            fail('UNSUPPORTED_INFERENCE_NUMBER',path,text,span=quantity.span())
+        if match:=CONFIDENT.search(text): fail('FALSE_CERTAINTY',path,text,span=match.span())
+        if match:=BANK_POSITION.search(text): fail('UNSUPPORTED_BANK_ATTRIBUTION',path,text,span=match.span())
+        if premise and (match:=completed_assertion_match(text) or ASSERTION.search(text)):
+            fail('UNSUPPORTED_FACTUAL_PREMISE',path,text,span=match.span())
         if financial:
             # The same financial guard applies to every published inference,
             # including scenarios and action rationales. It is a bounded check,
             # not proof that arbitrary prose follows semantically from a source.
-            if re.search(r'плавающ|фиксированн|остаток долга',text,re.I) and not (PREPARE.search(text) or analytical_title):
-                fail('UNSUPPORTED_COMPANY_CONDITION',path,text)
+            marker=next((item for item in FINANCIAL_MARKER.finditer(text)
+                         if not financial_marker_is_unknown(text,item)),None)
+            if marker is not None:
+                fail('UNSUPPORTED_COMPANY_CONDITION',path,text,span=marker.span())
             for match in PRODUCT_AS_LOAN.finditer(text):
                 if not re.search(r'\bне\s*$',text[:match.start('verb')],re.I):
-                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,match.group())
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,text,span=match.span())
+            for match in PAYMENT_CONCLUSION.finditer(text):
+                if not re.search(r'\bне\s*$',text[:match.start('verb')],re.I):
+                    fail('UNSUPPORTED_PAYMENT_CONCLUSION',path,text,span=match.span())
+            if unsupported_hold_baseline(text,event,assumption):
+                fail('UNSUPPORTED_COMPARISON_BASELINE',path,text)
             if re.search(r'сохран|без изменен|не измен',event,re.I):
                 for clause in re.split(r'[.!?;]',text):
                     if (re.search(r'(?:плат[её]ж|процентн\w*\s+расход)[^.!?]{0,60}(?:выраст|увелич|сниз|сократ)',clause,re.I)
@@ -83,9 +201,12 @@ def verify_draft(draft, context):
         # An explicit conditional premise must not smuggle in a completed event
         # after its boundary. Do not grant a whole paragraph immunity for 'if'.
         if condition:
-            for clause in re.split(r'[,;.!?]',text)[1:]:
-                if completed_assertion(clause) or ASSERTION.search(clause):
-                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,clause)
+            for boundary in re.finditer(r'([,;.!?])([^,;.!?]*)',text):
+                clause=boundary.group(2)
+                coordinated=boundary.group(1)==',' and CONDITION_CONTINUATION.search(clause)
+                match=completed_assertion_match(clause) or (ASSERTION.search(clause) if not coordinated else None)
+                if match:
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,clause,span=match.span())
     def refs(ids,path):
         for key in ids:
             if key not in context.evidence: fail('UNKNOWN_EVIDENCE',path,key)
@@ -105,7 +226,7 @@ def verify_draft(draft, context):
         root=f'impacts[{n}]'
         refs(item.evidence_ids,root+'.evidence_ids')
         text_guard(item.condition,root+'.condition',condition=True)
-        text_guard(item.mechanism,root+'.mechanism',premise=True,financial=True)
+        text_guard(item.mechanism,root+'.mechanism',premise=True,financial=True,assumption=item.condition)
         if not MODAL.search(item.mechanism): fail('CAUSAL_LINK_NOT_CONDITIONAL',root+'.mechanism',item.mechanism)
         if not supports_causal_channel(item.channel,event,item.condition,item.mechanism):
             fail('UNSUPPORTED_CAUSAL_CHANNEL',root+'.channel',item.channel)
@@ -115,18 +236,18 @@ def verify_draft(draft, context):
         root=f'scenarios[{n}]';refs(item.evidence_ids,root+'.evidence_ids')
         text_guard(item.label,root+'.label',premise=True)
         text_guard(item.condition,root+'.condition',condition=True)
-        text_guard(item.outcome,root+'.outcome',premise=True,financial=True)
+        text_guard(item.outcome,root+'.outcome',premise=True,financial=True,assumption=item.condition)
         if not MODAL.search(item.outcome): fail('CAUSAL_LINK_NOT_CONDITIONAL',root+'.outcome',item.outcome)
     known={item.id for item in draft.impacts}
     for n,item in enumerate(draft.actions):
         root=f'actions[{n}]'
         if not set(item.impact_ids)<=known: fail('UNKNOWN_IMPACT_REFERENCE',root+'.impact_ids')
         analytical_title=bool(PREPARE.search(item.title) or ANALYTIC_NOUN.search(item.title))
-        if not analytical_title or EXECUTE.search(item.title) or EXECUTIVE_NOUN.search(item.title):
-            fail('UNSUPPORTED_ACTION',root+'.title',item.title)
+        unsafe_action=EXECUTE.search(item.title) or EXECUTIVE_NOUN.search(item.title)
+        if not analytical_title or unsafe_action:
+            fail('UNSUPPORTED_ACTION',root+'.title',item.title,span=unsafe_action.span() if unsafe_action else None)
         for field,text in [('title',item.title),('rationale',item.rationale)]:
-            text_guard(text,root+'.'+field,premise=True,financial=True,
-                       analytical_title=field=='title' and analytical_title)
+            text_guard(text,root+'.'+field,premise=True,financial=True)
         for j,text in enumerate(item.required_data): text_guard(text,f'{root}.required_data[{j}]',premise=True)
     compared=set(); groups=set()
     for n,item in enumerate(draft.source_comparisons):
@@ -162,38 +283,77 @@ def verify_draft(draft, context):
         checked_facts=len(selected & context.evidence.keys()),checked_impacts=len(draft.impacts))
 
 
-def selected_evidence(draft,context):
+def selected_evidence(draft,context,*,projection_version=2):
     ids=['news:event',*(key for item in [*draft.impacts,*draft.scenarios,*draft.source_comparisons] for key in item.evidence_ids),
          *(key for key,value in context.evidence.items() if value.kind=='calculation')]
+    if projection_version>=2 and 'payments:summary' in context.evidence and any(
+            context.evidence[key].kind=='payment' for key in ids if key in context.evidence):
+        # A displayed peer share retains the denominator and scope as evidence.
+        ids.append('payments:summary')
     return [context.evidence[key] for key in dict.fromkeys(ids) if key in context.evidence]
 
 
-def project_insight(draft,context,verification,calculations=()):
-    evidence=selected_evidence(draft,context)
+def project_insight(draft,context,verification,calculations=(),*,projection_version=2):
+    if type(projection_version) is not int or projection_version not in (1,2):
+        raise ValueError('UNSUPPORTED_PROJECTION_VERSION')
+    evidence=selected_evidence(draft,context,projection_version=projection_version)
+    peer_directions={json.loads(item.quote)['direction'] for item in evidence if item.kind=='payment'
+                     and 'share_of_passed_direction_amount' in json.loads(item.quote)}
     labels={'mainokved_code':'ОКВЭД','mainokved_name':'Отрасль','region':'Регион','city':'Город',
             'org_type':'Форма организации из профиля','okfs_name':'Форма собственности из профиля',
             'company_age_years':'Возрастная категория из профиля','cl_type':'Класс клиента из профиля',
             'amount_workers_fns':'Диапазон работников ФНС','amount_workers_spark':'Диапазон работников СПАРК',
             'cl_product_loa_mark':'Признак кредитного продукта','cl_product_lea_mark':'Признак лизинга',
             'revenue_company':'Выручка из профиля (год и валюта не заданы)'}
-    company=[]
+    company=[];anchors={}
     for item in evidence:
+        facts=[]
         if item.kind=='company':
             data=json.loads(item.quote)
-            company.extend(labels.get(key,key)+': '+('отмечен в профиле' if value is True else str(value)) for key,value in data.items())
+            facts.extend(labels.get(key,key)+': '+('отмечен в профиле' if value is True else str(value)) for key,value in data.items())
+        elif item.kind=='calculation' and projection_version>=2:
+            facts.append(json.loads(item.quote)['description'])
         elif item.kind=='payment':
             data=json.loads(item.quote)
             if 'directions' in data:
-                company.append('Переданная платёжная выборка: входящие '+str(data['directions']['incoming']['total_amount'])+
-                    '; исходящие '+str(data['directions']['outgoing']['total_amount'])+'; период, валюта и полнота неизвестны.')
+                enriched=projection_version>=2 and any('largest_group' in totals for totals in data['directions'].values())
+                if enriched:
+                    facts.append('Переданная платёжная выборка: '+str(data['input_rows'])+
+                                 ' строк; период, валюта и полнота неизвестны.')
+                    for key,label in (('incoming','входящих'),('outgoing','исходящих')):
+                        if peer_directions and key not in peer_directions: continue
+                        totals=data['directions'][key];group=totals.get('largest_group')
+                        if group and group['counterparties'] and group['share_of_passed_direction_amount'] is not None:
+                            facts.append('Крупнейшие участники ('+', '.join(group['synthetic_us'])+
+                                '): '+str(group['counterparties'])+' из '+str(totals['unique_counterparties'])+
+                                '; сумма '+str(group['total_amount'])+' / '+str(totals['total_amount'])+
+                                f" = {group['share_of_passed_direction_amount']:.1%} переданных внешних {label} платежей.")
+                else:
+                    facts.append('Переданная платёжная выборка: входящие '+str(data['directions']['incoming']['total_amount'])+
+                        '; исходящие '+str(data['directions']['outgoing']['total_amount'])+'; период, валюта и полнота неизвестны.')
             elif 'share_of_passed_direction_amount' in data:
                 share=data['share_of_passed_direction_amount']
                 direction={'incoming':'входящие платежи','outgoing':'исходящие платежи','unknown':'неустановленное направление'}.get(data['direction'],data['direction'])
-                company.append('Участник платёжной выборки '+str(data.get('name') or data['synthetic_u'])+
+                facts.append('Участник платёжной выборки '+str(data.get('name') or data['synthetic_u'])+
                     ': '+direction+'; доля в переданной выборке направления '+(f'{share:.1%}' if share is not None else 'не определена')+'.')
-    why='; '.join(company)
-    if draft.impacts: why+='\n'+draft.impacts[0].condition+': '+draft.impacts[0].mechanism
-    else: why+='\nСвязь с деятельностью компании по доступным данным не установлена.'
+        company.extend(facts)
+        if facts: anchors[item.id]=' '.join(facts)
+    if projection_version>=2 and draft.impacts:
+        links=[]
+        for item in draft.impacts:
+            keys=[key for key in item.evidence_ids if key in anchors]
+            if 'payments:summary' in keys:
+                keys=[key for key in keys if context.evidence[key].kind!='payment' or key=='payments:summary']
+            links.append('Основания: '+'; '.join(anchors[key]+f' [{context.evidence[key].source_title}]' for key in keys)+
+                         '\n'+item.condition.rstrip('.,')+': '+item.mechanism)
+        why='\n\n'.join(links)
+        # A peer share's denominator is not necessarily named in the draft.
+        if 'payments:summary' in anchors and not any('payments:summary' in item.evidence_ids for item in draft.impacts):
+            why+='\n'+anchors['payments:summary']+' [Переданная платёжная выборка]'
+    else:
+        why='; '.join(company)
+        if draft.impacts: why+='\n'+draft.impacts[0].condition+': '+draft.impacts[0].mechanism
+        else: why+='\nСвязь с деятельностью компании по доступным данным не установлена.'
     channels={'financing':'финансирование','investment':'инвестиции','fx':'валютные расчёты','logistics':'логистика','inputs':'затраты','regulation':'регулирование','demand':'спрос','other':'прочие факторы'}
     directions={'risk':'риск','opportunity':'возможность','mixed':'возможны разные последствия'}
     impacts=[f'Условная гипотеза AI ({channels[item.channel]}, {directions[item.direction]}): {item.condition.rstrip(".")} — {item.mechanism}\nДля проверки: '+ '; '.join(item.data_needs) for item in draft.impacts]
@@ -218,7 +378,8 @@ def project_insight(draft,context,verification,calculations=()):
             comparisons.append(relationships[item.relationship]+': '+'; '.join(labels)+'. '+item.explanation)
         ai+=['Неразрешённое сопоставление источников AI:\n'+'\n'.join(comparisons),
              'Семантика сопоставления экспертно не проверена; проверка ID и дат не доказывает согласованность или противоречие.']
-    ai += [f'Локальный непроверенный банковский материал ({item.published_at.date().isoformat()})'+
+    ai += [('Локальный непроверенный банковский материал'+
+        (f' «{item.source_title}»' if projection_version>=2 else '')+f' ({item.published_at.date().isoformat()})')+
         (' [частичная выдержка]' if item.text_truncated else '')+f': «{item.quote}»' for item in reported]
     if draft.missing_data: ai+=['Неизвестно / требуется уточнить: '+'; '.join(draft.missing_data)]
     ai+=context.business.limitations

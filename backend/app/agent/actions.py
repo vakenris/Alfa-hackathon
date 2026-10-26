@@ -117,7 +117,8 @@ class ManagementActionEngine:
             verification = verify_draft(analysis.analysis, context)
             if not verification.passed:
                 return False
-            projected = project_insight(analysis.analysis, context, verification, analysis.calculations)
+            projected = project_insight(analysis.analysis, context, verification, analysis.calculations,
+                                        projection_version=analysis.report.get('projection_version',1))
             return projected.model_dump(mode="json") == analysis.insight.model_dump(mode="json")
         except (KeyError, TypeError, ValueError):
             return False
