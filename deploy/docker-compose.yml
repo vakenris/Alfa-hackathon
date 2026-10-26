@@ -83,6 +83,9 @@ services:
       REDIS_URL:          redis://redis:6379/0
       USE_IN_MEMORY_BUS:  "false"
 
+      # Auto seed companies and news on startup
+      AUTO_SEED_DEMO:     "true"
+
       # Server
       HOST: "0.0.0.0"
       PORT: "8000"
