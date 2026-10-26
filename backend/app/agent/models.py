@@ -84,7 +84,7 @@ class ImpactHypothesis(InternalModel):
     channel: Channel
     direction: Literal['risk', 'opportunity', 'mixed'] = 'mixed'
     condition: ShortText
-    mechanism: ShortText
+    mechanism: Annotated[str, Field(min_length=1, max_length=1000, strict=True)]
     evidence_ids: list[Identifier] = Field(min_length=1, max_length=6)
     data_needs: list[ShortText] = Field(default_factory=list, max_length=4)
     horizon: Literal['short', 'medium', 'long', 'unknown'] = 'unknown'

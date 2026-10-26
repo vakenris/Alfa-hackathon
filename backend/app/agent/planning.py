@@ -34,17 +34,41 @@ def channels_for_text(text):
 
 
 def supports_causal_channel(channel, event, condition, mechanism):
-    """Accept an explicit conditional bridge from an actual event topic.
+    """Check a bounded event-to-mechanism bridge independently of its label.
 
-    A downstream effect need not be named in the news. Its mechanism must name
-    the target topic, and its condition/mechanism must also explain the event's
-    upstream topic. Company premises, references, modality and numbers are
-    checked separately. Topic overlap cannot prove economic causality.
+    Planning priorities do not establish factual relevance. Even an event's
+    direct channel, or ``other``, needs a bridge in the mechanism itself; a
+    condition mentioning credit cannot justify an unrelated conclusion.
+    Lexical links keep topics outside the channel vocabulary usable. Explicit
+    references to the affected segment also permit cautious sector summaries.
+    These are relevance heuristics, not proof of economic causality.
     """
-    if channel=='other' or channel in channels_for_text(event):
+    event_channels=set(_direct_channels(event))
+    body_channels=set(_direct_channels(mechanism))
+    # Cost of capital is an explicit financing link even without the literal
+    # words "кредит" or "ставка" (as in the saved B01 CAPEX mechanism).
+    capital_cost=r'\bстоимост\w*\s+капитал\w*'
+    if re.search(capital_cost,event,re.I): event_channels.add('financing')
+    if re.search(capital_cost,mechanism,re.I): body_channels.add('financing')
+    event_terms,_=_features(event)
+    body_terms,_=_features(mechanism)
+    # The search stemmer is deliberately small: e.g. "условия" and "условий"
+    # retain different suffixes. Permit a shared nontrivial stem here as well.
+    shared_terms={left for left in event_terms for right in body_terms
+                  if left.startswith(right) or right.startswith(left)}
+    upstream=bool(event_channels & body_channels or shared_terms)
+    # Preserve an explicit reference to the same affected segment without
+    # requiring every industry to appear in a closed topic dictionary.
+    segment=r'\bзатронут\w*\s+(?:сегмент|отрасл|рын|област)\w*'
+    anaphora=bool(re.search(segment,condition,re.I) and re.search(segment,mechanism,re.I))
+    # Only a neutral summary of changed conditions and decision preparation
+    # may rely on this reference. Merely adding "в затронутом сегменте" to
+    # an unrelated concrete outcome cannot establish an economic bridge.
+    neutral_summary=bool(re.search(r'\bизмен\w*\s+услов\w*',mechanism,re.I)
+        and re.search(r'\b(?:план|выбор|вариант|решени|работ)\w*',mechanism,re.I))
+    if anaphora and neutral_summary and (channel in event_channels or channel=='other' and shared_terms):
         return True
-    return (channel in _direct_channels(mechanism)
-            and bool(set(_direct_channels(event)) & set(_direct_channels(condition+' '+mechanism))))
+    return upstream and (channel=='other' or channel in body_channels)
 
 
 def build_plan(company,event,counterparties,source,*,has_financial_inputs=False):

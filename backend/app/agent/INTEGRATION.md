@@ -4,6 +4,45 @@
 Текущее приложение всё ещё использует mock. Здесь описаны задачи владельцев;
 API, worker, DB, shared schemas, LLM-инфраструктура и frontend не изменялись.
 
+## Проверенный срез и smoke-тест: 26 октября 2026
+
+Проверен локальный `feature/llm-agent`, HEAD `a86354b` (`Update AI agent`),
+включая состояние рабочего дерева: до этой работы оно было чистым. Удалённые
+ветки изучались через существующие refs; fetch, переключение и объединение не
+выполнялись. Замечания об `origin/Backend` относятся к срезу `fce14a4`, а не к
+непроверенному текущему состоянию сервера Git.
+
+Новый `tests/test_backend_integration_smoke.py` проверяет две цепочки:
+
+1. Настоящие `CompanyResponse` / `NewsArticleResponse` из объектов с атрибутами,
+   `CounterpartyItem` → production `RuntimeAgentEngine` → настоящий core,
+   `BackendAnalyticsSource.from_repository_factory()` и общий бюджетируемый
+   HTTP-клиент → `MLInsightResult` → `InsightResponse` из объекта с атрибутами.
+2. `generate_analysis()` → JSON round-trip полного `AgentAnalysisResult` →
+   grounded Q&A → существующий `QuestionAnswerResponse`. Проверены банковские
+   цитаты с датой/document/page/hash, платёжная выборка, `needs_data` о долге
+   при наличии флага кредитного продукта, отказ для другой компании и изменённых
+   metadata источника. Все вопросы обходятся без дополнительных HTTP/DB-вызовов.
+
+Используются `httpx.MockTransport`, подставные repository/session и синтетические
+ответы/metadata; это не оценка качества настоящей LLM. Реальные секреты и env
+конфигурация не читаются; сетевое подключение запрещено тестом. SQLAlchemy в
+локальном окружении агента отсутствует, поэтому настоящий SQL-репозиторий,
+транзакции, миграции, worker и FastAPI startup здесь не исполнялись. Публичная
+проекция совместима с сохранением по коду `InsightRepository.save_insight`, но
+настоящая запись и чтение БД этим smoke-тестом не подтверждаются.
+
+Из корня репозитория, PowerShell:
+
+```powershell
+.\backend\app\agent\.venv\Scripts\python.exe -B -m unittest backend.app.agent.tests.test_backend_integration_smoke -v
+```
+
+Результат: **2/2** новых smoke-теста. Вместе с существующими
+`agent.tests.test_backend_source` и `llm.tests.test_agent_integration`:
+**28/28**, без платных вызовов. Синтетические usage и тариф в тесте проверяют
+проводку учёта, а не фактическую стоимость API организаторов.
+
 ## Неизменённый контракт
 
 `backend/app/ml/interface.py`:
@@ -33,7 +72,12 @@ async def generate_insight(
 
 В `backend/app/worker/tasks.py` заменить создание `MockMLInsightEngine` посредством
 существующего `set_ml_engine(...)` в composition root процесса, где выполняется
-worker. Настройка только API-процесса не подключит отдельный worker-процесс.
+worker. Сейчас `api/v1/insights.py:create_insight_job()` ставит
+`run_insight_pipeline` в FastAPI `BackgroundTasks` того же процесса: устанавливать
+engine при инициализации приложения до приёма заданий. Если worker будет вынесен
+в другой процесс, DI потребуется также там. Настройка только API-процесса не
+подключит отдельный worker-процесс. Низкоуровневый `AgentInsightEngine` создаёт
+сам runtime; в production передавать runtime с общей защитой бюджета.
 
 Схема зависимостей, не самостоятельная команда запуска:
 
@@ -206,6 +250,41 @@ Frontend: постоянная точка входа в «аналитику с�
 checkout отсутствуют, сквозной UI не проверялся.
 В `origin/Backend` frontend уже присутствует; это не подтверждает его работу с
 настоящим агентом. На прочитанном remote-срезе mock worker и заготовка Q&A остаются.
+
+## Конкретные задачи подключения и владельцы
+
+| Владелец | Место | Минимальное действие |
+| --- | --- | --- |
+| Наша часть агента | `tests/test_backend_integration_smoke.py` | Готово: контрактный smoke на DTO, repository bridge, HTTP transport и сохранённом companion. Production-код агента для этих контрактов менять не требуется. |
+| Backend + владелец LLM | `main.py:lifespan`, `worker/tasks.py:set_ml_engine` | В composition root собрать runtime из фабрик свежих клиента/источника. Передать общий BudgetGuard с настоящим атомарным store, утверждёнными model ID, тарифом и корректным input bound. Согласовать HTTP timeout и AgentConfig; один только AgentConfig не меняет лимит клиента. |
+| Backend worker + DB | `worker/tasks.py:run_insight_pipeline`, `db/repositories/insight_repo.py:save_insight` | Для сохранения Q&A-контекста вызвать `generate_analysis()` один раз; публичный результат взять из `.insight`, весь companion сохранить на сервере с insight/job/company/event и версией из report. Не вызывать следом `generate_insight()`: это второй платный анализ. Публичную запись и companion сохранять согласованно до SUCCESS; нынешний метод репозитория сам делает commit. |
+| Backend API | `api/v1/questions.py:ask_follow_up_question`, `services/insight_service.py` | Загрузить доверенный companion и авторизованную компанию, восстановить `AgentAnalysisResult`, вызвать `ManagementActionEngine.answer_question`; отобразить summary, needs_data, ограничения и источники в текущий QuestionAnswerResponse. Не реконструировать companion из шести текстов. |
+| Backend / банковские данные | `db/models/news.py:NewsArticle`, `db/repositories/news_repo.py:list_bank_analytics` | Предоставить доверенное соответствие article → URL/document/page/hash/статус проверки, например через resolver. Сейчас этих полей нет в NewsArticle. Без них поиск возможен, но источник остаётся unverified и не выдаётся за позицию банка. |
+| Backend / ETL | `db/repositories/company_repo.py:get_top_counterparties` | Согласовать агрегаты и направления из ETL-ветки, исключение self, период/валюту/coverage. Текущий worker запрашивает limit=5: репозиторий даёт до пяти строк каждого направления, а не полный платёжный граф. |
+| Backend / очередь | `api/v1/insights.py:create_insight_job`; в `origin/Backend` также `services/automatic_insights.py:schedule_company_news` и `api/v1/feed.py` | До платного подключения ограничить постановку заданий, дедуплицировать активные задания атомарно и включить общий бюджет. Текущий POST проверяет только уже сохранённый insight; повторный POST до его готовности может создать ещё одно задание. |
+| Backend / доступ | `core/security.py:get_current_user_role`, API получения insight и Q&A | Роль из X-User-Role не подтверждает доступ к company_id/insight_id. Добавить проверку доступа к компании перед чтением анализа/источников и постановкой задания. Проверки ID внутри агента не заменяют API-авторизацию. |
+
+В **текущем checkout** `GET /companies/{company_id}/feed` только читает и сортирует
+новости через `FeedService`; генерация вызывается отдельным POST. В **прочитанном
+origin/Backend** GET дополнительно вызывает `schedule_company_news`, где запрос
+всех NewsArticle.id не имеет ограничения по видимой странице. Поэтому после
+объединения с этой веткой простой замены mock недостаточно: открытие ленты может
+поставить много платных заданий. Общий бюджет ограничит стоимость, но не делает
+такую массовую постановку приемлемой. До этого исправления платную DI не включать.
+
+На стороне агента подтверждены все обязательные поля MLInsightResult. По коду
+репозиторий переносит их в Insight/Evidence, а InsightService возвращает через
+InsightResponse. Служебные id/job/company/event/created_at добавляет backend.
+Даты и page/hash источников, structured analysis, verification и usage в эту
+публичную схему не входят: они сохраняются только в companion. Пока companion
+store отсутствует, шесть блоков можно интегрировать отдельно, но grounded Q&A
+после перезапуска, аудит verification и полный provenance остаются заблокированы.
+
+Следующий шаг нашей части — совместно с владельцем backend повторить smoke в
+его отдельной тестовой БД после DI и сохранения companion: запись → чтение → Q&A
+после перезапуска. Подгонять DTO, менять RAG или переписывать агент до этого
+оснований не найдено. Работающие локальные tests не подтверждают транзакции,
+межпроцессный budget store, API ACL или frontend.
 
 ## Проверяемый порядок подключения
 
