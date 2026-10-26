@@ -10,6 +10,7 @@ from backend.app.db.models.agent_trace import (
     AgentTraceStep,
 )
 from backend.app.db.models.audit import AuditLog
+from backend.app.db.models.bank_document import BankDocument, BankDocumentPage
 
 
 __all__ = [
@@ -22,4 +23,6 @@ __all__ = [
     "JobRecord",
     "AgentTraceStep",
     "AuditLog",
+    "BankDocument",
+    "BankDocumentPage",
 ]

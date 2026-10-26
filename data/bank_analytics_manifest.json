@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "source_origin": "hackathon_bank_corpus",
+  "documents": [
+    {
+      "source_file": "ALFA-7M26.pdf",
+      "source_sha256": "3c64c1e43f3b46a795f9581967f2dbc8efb0994cb77ab82e95da180830e9ff8c",
+      "title": "Макростатистика 7М26: данные по рынку труда не подтверждают охлаждения экономики",
+      "category": "Макроэкономика",
+      "published_on": "2026-09-07"
+    },
+    {
+      "source_file": "ALFA-consumption.pdf",
+      "source_sha256": "807ee9925cf7d15ecffc72ad7142f9a83d342cd19690e12dd3b90aa2ba8ea1c6",
+      "title": "Потребление на пике",
+      "category": "Макроэкономика",
+      "published_on": "2026-08-05"
+    },
+    {
+      "source_file": "ALFA-Macro_Insights-Policy_Rate_11Sep.pdf",
+      "source_sha256": "92a96805f2b720f76bd0c52d2491044812b38401ab62d0f4a9157b4ca81c49bb",
+      "title": "Ключевая ставка ЦБ РФ: ставка без изменения на 14,0%, риторика стала жестче",
+      "category": "Макроэкономика",
+      "published_on": "2026-09-11"
+    },
+    {
+      "source_file": "ALFA-macro_stat1H26.pdf",
+      "source_sha256": "84899553fadf3e49abac7074c7b7d2afc2fa5c70b7fde0bf4c3eabe3d7402266",
+      "title": "Макростатистика 1П26: слабый рост 1П26 смещает наш прогноз роста ВВП на 0,1% за год",
+      "category": "Макроэкономика",
+      "published_on": "2026-07-31"
+    },
+    {
+      "source_file": "ALFA_Russian_Steels_1К21PreviewUpdate_15Apr2021.pdf",
+      "source_sha256": "36eaaa58ae68d858db3600dbf3cc93d0bdefb8ca03f1f5cc154c532cc32e0c86",
+      "title": "Российская сталь: ралли цен продолжается; прогноз результатов за 1К21",
+      "category": "Металлургия",
+      "published_on": "2021-04-15",
+      "historical": true
+    },
+    {
+      "source_file": "FI_Strategy_3Q26_22072026.pdf",
+      "source_sha256": "6c3a4882ee784b608880693d8ba2b62d0ba2236e34b404179adaab909c6dd046",
+      "title": "Тактический взгляд на 3-й квартал 2026: время собирать камни",
+      "category": "Долговой рынок",
+      "published_on": "2026-07-22"
+    },
+    {
+      "source_file": "Gold_digest_August26.pdf",
+      "source_sha256": "4159576a6223985dd318b6f5a04ad4aeb888f47a6c266d0e9ee9eb35bf01e245",
+      "title": "Обзор рынка золота: август 2026",
+      "category": "Драгоценные металлы",
+      "published_on": null,
+      "publication_period": "2026-08"
+    },
+    {
+      "source_file": "Inflation_tracker_02.pdf",
+      "source_sha256": "09d5537f6a52f5f8f2d9518ed9171e794382972ce38cbdc4bd3099b2db129d0c",
+      "title": "Инфляция 25–31 августа: основные выводы",
+      "category": "Макроэкономика",
+      "published_on": "2026-09-02"
+    },
+    {
+      "source_file": "Бонд_Бриф_14092026.pdf",
+      "source_sha256": "87dc17520e2a744f95580ee2ec42461d0ee6ebf19e752622a49c49600cb1b055",
+      "title": "Бонд Бриф: итоги недели",
+      "category": "Долговой рынок",
+      "published_on": "2026-09-14"
+    }
+  ]
+}
