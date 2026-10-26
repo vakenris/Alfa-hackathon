@@ -5,7 +5,11 @@ import inspect
 
 from backend.app.core.config import settings
 from backend.app.core.logging import logger, setup_logging
-from backend.app.db.session import async_session_factory, engine, init_db
+from backend.app.db.session import (
+    async_session_factory,
+    engine,
+    init_db,
+)
 from backend.app.ml.interface import MockMLInsightEngine
 from backend.app.worker.config import worker_settings
 from backend.app.worker.queue import DatabaseJobQueue
@@ -28,10 +32,12 @@ def load_engine(mock: bool):
         )
 
     module_name, function_name = path.split(":", 1)
+
     factory = getattr(
         importlib.import_module(module_name),
         function_name,
     )
+
     instance = factory()
 
     if not inspect.iscoroutinefunction(
@@ -49,7 +55,12 @@ def load_engine(mock: bool):
     return instance
 
 
-async def run(*, once: bool, mock: bool):
+async def run(
+    *,
+    once: bool,
+    mock: bool,
+    job_id: str | None = None,
+):
     try:
         if worker_settings.mode != "database":
             raise ValueError(
@@ -74,7 +85,7 @@ async def run(*, once: bool, mock: bool):
 
         while True:
             await queue.expire_stale()
-            job = await queue.claim()
+            job = await queue.claim(job_id=job_id)
 
             if job is not None:
                 try:
@@ -85,7 +96,7 @@ async def run(*, once: bool, mock: bool):
                         job.id,
                     )
 
-            if once:
+            if once or job_id is not None:
                 return
 
             if job is None:
@@ -103,6 +114,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Persistent insight worker"
     )
+
     parser.add_argument(
         "--once",
         action="store_true",
@@ -113,12 +125,18 @@ def main():
         action="store_true",
         help="Explicit demo engine; synthetic output",
     )
+    parser.add_argument(
+        "--job-id",
+        help="Process only this PENDING job and exit",
+    )
+
     args = parser.parse_args()
 
     try:
         asyncio.run(run(
             once=args.once,
             mock=args.mock,
+            job_id=args.job_id,
         ))
     except KeyboardInterrupt:
         pass

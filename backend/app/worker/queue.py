@@ -37,9 +37,17 @@ class DatabaseJobQueue:
 
             if job_id is not None:
                 statement = statement.where(
-                    JobRecord.id == job_id,
-                    JobRecord.company_id == company_id,
-                    JobRecord.event_id == event_id,
+                    JobRecord.id == job_id
+                )
+
+            if company_id is not None:
+                statement = statement.where(
+                    JobRecord.company_id == company_id
+                )
+
+            if event_id is not None:
+                statement = statement.where(
+                    JobRecord.event_id == event_id
                 )
 
             candidate = await session.scalar(
@@ -75,8 +83,8 @@ class DatabaseJobQueue:
             return ClaimedJob(*row) if row else None
 
     async def expire_stale(self):
-        # Runtime is bounded to <= 9 min.
-        # Interrupted jobs expire after 10 min.
+        # Runtime ограничен 9 минутами.
+        # Прерванные задания устаревают через 10 минут.
         cutoff = utc_now() - timedelta(minutes=10)
 
         async with self.session_factory() as session:
@@ -84,6 +92,7 @@ class DatabaseJobQueue:
                 JobRecord.status == "PROCESSING",
                 JobRecord.updated_at < cutoff,
             )
+
             saved = exists(
                 select(Insight.id).where(
                     Insight.job_id == JobRecord.id

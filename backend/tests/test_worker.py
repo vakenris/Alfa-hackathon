@@ -29,6 +29,7 @@ class TestBus:
     async def publish(self, channel, payload):
         if self.fail:
             raise ConnectionError("Test Redis outage")
+
         self.messages.append(payload)
 
 
@@ -58,7 +59,10 @@ class TestEngine:
             raise RuntimeError("Test ML failure")
 
         await asyncio.sleep(self.delay)
-        await tracer.emit_step("test step", "test description")
+        await tracer.emit_step(
+            "test step",
+            "test description",
+        )
 
         return result()
 
@@ -69,6 +73,7 @@ async def worker_db(tmp_path, monkeypatch):
         "sqlite+aiosqlite:///"
         + (tmp_path / "worker.db").as_posix()
     )
+
     factory = async_sessionmaker(
         engine,
         expire_on_commit=False,
@@ -99,9 +104,15 @@ async def worker_db(tmp_path, monkeypatch):
     monkeypatch.setattr(
         tasks, "async_session_factory", factory
     )
-    monkeypatch.setattr(tasks, "current_ml_engine", ml)
-    monkeypatch.setattr(tasks, "get_event_bus", lambda: bus)
-    monkeypatch.setattr(worker_settings, "mode", "inline")
+    monkeypatch.setattr(
+        tasks, "current_ml_engine", ml
+    )
+    monkeypatch.setattr(
+        tasks, "get_event_bus", lambda: bus
+    )
+    monkeypatch.setattr(
+        worker_settings, "mode", "inline"
+    )
 
     try:
         yield factory, ml, bus
@@ -144,6 +155,7 @@ async def test_inline_pipeline_is_idempotent_and_persists_trace(
         assert await session.scalar(
             select(func.count()).select_from(Insight)
         ) == 1
+
         assert await session.scalar(
             select(func.count()).select_from(AgentTraceStep)
         ) == 1
@@ -151,7 +163,8 @@ async def test_inline_pipeline_is_idempotent_and_persists_trace(
     assert bus.messages[-1]["event"] == "completed"
 
     step = next(
-        item for item in bus.messages
+        item
+        for item in bus.messages
         if item["event"] == "step"
     )
     assert step["timestamp"].endswith("+00:00")
@@ -263,7 +276,9 @@ async def test_status_failure_after_commit_keeps_success(
 
         return await finish(*args, **kwargs)
 
-    monkeypatch.setattr(tasks, "_finish", fail_once)
+    monkeypatch.setattr(
+        tasks, "_finish", fail_once
+    )
 
     await tasks.run_insight_pipeline("job", 1, 1)
 
@@ -279,15 +294,20 @@ async def test_stale_jobs_recover_from_database_without_regeneration(
     old = utc_now() - timedelta(minutes=11)
 
     await add_job(
-        factory, "empty",
-        status="PROCESSING", updated_at=old,
+        factory,
+        "empty",
+        status="PROCESSING",
+        updated_at=old,
     )
     await add_job(
-        factory, "saved",
-        status="PROCESSING", updated_at=old,
+        factory,
+        "saved",
+        status="PROCESSING",
+        updated_at=old,
     )
     await add_job(
-        factory, "active",
+        factory,
+        "active",
         status="PROCESSING",
     )
 
@@ -313,7 +333,8 @@ def test_mock_engine_requires_explicit_selection(monkeypatch):
     )
 
     with pytest.raises(
-        ValueError, match="WORKER_ENGINE_FACTORY"
+        ValueError,
+        match="WORKER_ENGINE_FACTORY",
     ):
         load_engine(False)
 
@@ -339,10 +360,35 @@ async def test_cancellation_after_commit_preserves_success(
 
         return await finish(*args, **kwargs)
 
-    monkeypatch.setattr(tasks, "_finish", cancel_once)
+    monkeypatch.setattr(
+        tasks, "_finish", cancel_once
+    )
 
     with pytest.raises(asyncio.CancelledError):
         await tasks.run_insight_pipeline("job", 1, 1)
 
     assert ml.calls == 1
     assert await status(factory) == "SUCCESS"
+
+
+@pytest.mark.asyncio
+async def test_selecting_job_id_leaves_other_pending_jobs_untouched(
+    worker_db,
+):
+    factory, ml, _ = worker_db
+
+    await add_job(factory, "first")
+    await add_job(factory, "selected")
+
+    queue = DatabaseJobQueue(factory)
+    job = await queue.claim(job_id="selected")
+
+    assert job.id == "selected"
+
+    await tasks.execute_job(job)
+
+    assert await status(factory, "first") == "PENDING"
+    assert await status(factory, "selected") == "SUCCESS"
+    assert ml.calls == 1
+    assert await queue.claim(job_id="missing") is None
+    assert await queue.claim(job_id="selected") is None
