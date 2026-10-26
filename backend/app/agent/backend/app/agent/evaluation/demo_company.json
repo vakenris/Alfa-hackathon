@@ -1,9 +1,0 @@
-{
-  "id": 1,
-  "synthetic_u": "DEMO_FACTORY_NOT_REAL_CLIENT",
-  "name": "СИНТЕТИЧЕСКИЙ демонстрационный завод",
-  "mainokved_code": "24.10",
-  "mainokved_name": "Производство чугуна, стали и ферросплавов",
-  "cl_product_loa_mark": true,
-  "revenue_company": 1000
-}

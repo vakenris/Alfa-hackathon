@@ -163,6 +163,24 @@ class BackendAnalyticsSourceTests(unittest.IsolatedAsyncioTestCase):
         source = BackendAnalyticsSource(AsyncMock(return_value=docs))
         self.assertEqual([doc.article.id for doc in await self.search(source, "налоги")], [1, 2, 3])
 
+    async def test_future_articles_cannot_fill_top_n_and_displace_available_history(self):
+        docs = [self.document(index, "Налоговая политика", date=datetime(2026, 10, day, tzinfo=timezone.utc))
+                for index, day in ((1, 24), (2, 23), (3, 22), (4, 20))]
+        loader = AsyncMock(return_value=docs)
+        result = await self.search(BackendAnalyticsSource(loader), "налоги", limit=3)
+        loader.assert_awaited_once_with(50)
+        self.assertEqual([doc.article.id for doc in result], [4])
+        self.assertTrue(all(doc.article.published_at <= self.event.published_at for doc in result))
+
+    async def test_as_of_boundary_uses_instants_and_naive_repository_dates_as_utc(self):
+        docs = [
+            self.document(1, "Налоги", date=datetime.fromisoformat("2026-10-21T03:00:00+03:00")),
+            self.document(2, "Налоги", date=datetime(2026, 10, 21)),
+            self.document(3, "Налоги", date=datetime.fromisoformat("2026-10-21T03:00:01+03:00")),
+        ]
+        result = await self.search(BackendAnalyticsSource(AsyncMock(return_value=docs)), "налоги")
+        self.assertEqual([doc.article.id for doc in result], [1, 2])
+
     async def test_duplicate_ids_are_not_returned_twice(self):
         doc = self.document(1, "Инфляция")
         source = BackendAnalyticsSource(AsyncMock(return_value=[doc, doc]))

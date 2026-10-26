@@ -12,14 +12,8 @@ class LLMClientProtocol(Protocol):
 
 _DEFAULT_RESPONSE_JSON = json.dumps(
     {
-        "what_happened": "Демонстрационный ответ: реальный анализ новости не выполнялся.",
-        "why_important": "Значимость для компании в подставном ответе не оценивалась.",
-        "consequences": "Последствия в подставном ответе не оценивались.",
-        "bank_view": "Подтверждённая позиция Альфа-Банка не предоставлена.",
-        "ai_view": "Это фиксированный тестовый ответ, а не вывод языковой модели.",
-        "recommended_action": "Для содержательного анализа требуется подключить LLM-клиент.",
-        "relevant_bank_product": None,
-        "evidences": [],
+        "applicability": "insufficient",
+        "missing_data": ["Это фиксированный учебный ответ; содержательный анализ моделью не выполнялся."],
     },
     ensure_ascii=False,
 )

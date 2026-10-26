@@ -1,7 +1,8 @@
 """Read-only, bounded lexical search over existing bank-analytics articles.
 
 This adapter is not PDF ingestion or RAG. Its coverage is the newest at most 50
-articles supplied by a loader, not the entire bank corpus. Dates break score ties;
+articles supplied by a loader, not the entire bank corpus. Articles published after
+the event are excluded before top-N; dates break score ties among usable articles;
 old publications are not discarded because they can be valid historical sources.
 An empty result means no match within that coverage. Loader/repository failures
 are deliberately raised, so callers can distinguish a failure from no matches.
@@ -203,7 +204,8 @@ class BackendAnalyticsSource:
                 item.model_dump(mode="python") if isinstance(item, AnalyticsDocument) else item,
             )
             article = document.article
-            if not article.is_bank_analytics or article.id in seen_ids:
+            if (not article.is_bank_analytics or article.id in seen_ids
+                    or _date_key(article.published_at) > _date_key(event.published_at)):
                 continue
             seen_ids.add(article.id)
             title_terms, title_topics = _features(article.title[:2048])

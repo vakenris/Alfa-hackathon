@@ -1,296 +1,234 @@
-"""Conservative executable checks and deterministic projection, not semantic truth certification."""
-
+"""One check over selected evidence and explicitly hypothetical prose; deterministic UI projection."""
 import re
-from decimal import Decimal
+import json
 from datetime import timezone
-from itertools import combinations
-
+from .models import CheckIssue, VerificationReport, BANK_VIEW_UNAVAILABLE, DISCLAIMER
 from backend.app.ml.interface import MLInsightResult
 from backend.app.schemas.insight import EvidenceItem
+from .planning import supports_causal_channel
 
-from .context import GroundedRunContext, json_text
-from .applicability import event_qualitative_channels
-from .models import BANK_VIEW_UNAVAILABLE, DISCLAIMER, CheckIssue, DraftInsight, VerificationReport
-
-
-ASSERTIVE = re.compile(
-    r"гарантир|неизбеж|обязательн|безусловн|однозначн|несомнен|точно\b|"
-    r"доказан|привед[её]т|непременно|will\b|guarantee|certainly", re.I,
-)
-CONDITIONAL = re.compile(r"может|могут|возмож|при услов|если|зависит|could\b|may\b", re.I)
-BANK_ATTRIBUTION = re.compile(
-    r"(?:банк|альфа)[^.!?]{0,50}(?:счита|рекоменду|прогноз|гарантир|подтвержда|утвержда)|"
-    r"позици[яию] банка|(?:по (?:мнению|оценке|прогнозу|данным)|согласно)[^.!?]{0,45}(?:банк|альфа)|"
-    r"альфа|alfa|bank (?:says|expects|recommends)", re.I,
-)
-UNSUPPORTED_COMPANY = re.compile(
-    r"(?:у компании|компания имеет|компании принадлежат)[^.!?]{0,70}"
-    r"(?:плавающ|фиксированн|остаток долга|кредитный договор)|"
-    r"(?:прибыль|выручка|плат[её]ж[аи]|процентные расходы) компании (?:выраст|увелич|сниз|сократ)", re.I,
-)
-FEATURE_LABELS = {
-    "mainokved_code": "ОКВЭД", "mainokved_name": "Отрасль", "region": "Регион",
-    "city": "Город", "group_id": "Идентификатор группы", "fts_country_name": "Страны ФТС",
-    "revenue_company": "Выручка за 2025 год, RUB", "cl_product_loa_mark": "Признак кредитных продуктов",
-    "cl_product_lea_mark": "Признак лизинга", "cl_product_dep_mark": "Признак депозитов",
-    "cl_product_gar_mark": "Признак банковских гарантий", "cl_product_rko_mark": "Расчётное обслуживание",
-    "cl_product_zpp_mark": "Признак зарплатного проекта", "factoring_mark": "Признак факторинга",
-    "fts_flag": "Наличие сведений ФТС",
-}
-
-# Auditable minimum applicability checks, intentionally conservative. They rule
-# out obvious unrelated mechanisms; lexical overlap is not causal entailment.
-CHANNEL_RULES = {
-    "financing": (r"ставк|кредит|финансир|инфляц|фондирован|за[её]м", r"ставк|кредит|финансир|фондирован|за[её]м|ликвидност"),
-    "investment": (r"ставк|инвест|оборудован|модернизац|строител", r"инвест|проект|бюджет|капитал|модернизац"),
-    "fx": (r"валют|курс|доллар|юан|евро", r"валют|курс|расч[её]т|импорт|экспорт"),
-    "logistics": (r"логист|транспорт|фрахт|перевоз|маршрут|постав", r"логист|транспорт|достав|перевоз|постав|себестоим"),
-    "inputs": (r"сырь|оборудован|нефт|газ|энерг|металл|комплект", r"сырь|себестоим|производ|оборудован|затрат|снабжен"),
-    "regulation": (r"закон|регулир|налог|пошлин|ограничен|санкци|требован", r"закон|налог|соответств|пошлин|ограничен|затрат|документ"),
-    "demand": (r"спрос|потреблен|продаж|заказ|доход", r"спрос|продаж|выручк|заказ|потреблен"),
-}
-
-
-def utc(value):
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
-
-
-def complete_quote(quote: str, visible: str, *, title: bool = False) -> bool:
-    """Do not let a substring drop negation or the subject of a source statement."""
-    if quote != quote.strip():
-        return False
-    if title:
-        return quote == visible.strip()
-    start = visible.find(quote)
-    while start >= 0:
-        before = visible[:start]
-        after = visible[start + len(quote):]
-        left_boundary = not before.strip() or before.endswith("\n") or (
-            before[-1:].isspace() and before.rstrip()[-1:] in ".!?"
-        )
-        right_boundary = not after.strip() or after.startswith("\n") or (
-            quote[-1:] in ".!?" and (after[:1].isspace() or after[:1] in '\"»”')
-        )
-        if left_boundary and right_boundary:
-            return True
-        start = visible.find(quote, start + 1)
+CONDITION = re.compile(r'^(?:если\b|при условии\b|в случае\b)',re.I)
+MODAL = re.compile(r'может|могут|возмож|зависит|зависеть',re.I)
+COMPLETED = re.compile(
+    r'\b(?:полученн\w*|выданн\w*|предоставленн\w*|привлеч[её]нн\w*|заключ[её]нн\w*|'
+    r'подписанн\w*|погашенн\w*|реализованн\w*|запущенн\w*|'
+    r'получил[аио]?|выдал[аио]?|предоставил[аио]?|заключил[аио]?|подписал[аио]?|'
+    r'погасил[аио]?|реализовал[аио]?|запустил[аио]?|привл[её]к(?:ла|ли|ло)?|'
+    r'получен[аоы]?|выдан[аоы]?|заключ[её]н[аоы]?|погашен[аоы]?)\b',re.I)
+COMPANY_SUBJECT = r'(?:компани[яи]|предприяти[ея]|завод[а]?|клиент[а]?)'
+ASSERTION = re.compile(
+    rf'\b(?:у\s+{COMPANY_SUBJECT}\s+(?:есть|имеется|имеются)|'
+    rf'{COMPANY_SUBJECT}\s+(?:(?:уже|сейчас|фактически)\s+)?'
+    r'(?:имеет|получает|владеет|обслуживает|погашает|выплачивает|'
+    r'находится\s+на\s+грани\s+банкротства))\b',re.I)
+PRODUCT_AS_LOAN = re.compile(
+    r'(?:флаг|признак|продукт)[^.!?;]{0,70}?'
+    r'(?P<verb>подтвержда\w*|доказыва\w*|означа\w*)'
+    r'[^.!?;]{0,50}(?:получени\w*\s+кредит|наличи\w*\s+(?:долг|кредит)|действующ\w*\s+кредит)',re.I)
+CONFIDENT = re.compile(r'гарантир|неизбеж|несомнен|безусловно|однозначно|точно\s+(?:выраст|сниз|будет)',re.I)
+BANK_POSITION = re.compile(r'(?:банк|альфа)[^.!?]{0,45}(?:счита|рекоменду|прогнозиру|утвержда)|по (?:мнению|оценке) банка|позиция банка',re.I)
+EXECUTE = re.compile(r'\b(?:взять|выдать|погасить|купить|продать|подписать|закрыть|уволить|перечислить|остановить)\b|сократ\w*\s+(?:штат|персонал)',re.I)
+PREPARE = re.compile(r'^(?:запросить|проверить|сравнить|сверить|сверять|сопоставить|оценить|подготовить|уточнить|проанализировать|изучить|обсудить|рассмотреть|собрать)\b',re.I)
+ANALYTIC_NOUN = re.compile(r'^(?:сверка|проверка|сравнение|сопоставление|оценка|подготовка|уточнение|анализ|изучение|обсуждение|рассмотрение|сбор|запрос)\b',re.I)
+# A safe analytical heading cannot introduce a second executive action. Match
+# nominative action names, not objects such as "условия получения и погашения".
+EXECUTIVE_NOUN = re.compile(
+    r'(?:[,;.!?\n]|\b(?:и|затем|далее)\b)\s*'
+    r'(?:получение|выдача|погашение|покупка|продажа|подписание|закрытие|увольнение|'
+    r'перечисление|остановка|сокращение\s+(?:штата|персонала))\b',re.I)
+WRITTEN_QUANTITY = re.compile(
+    r'\b(?:нол[ьяю]|нуль|нулев\w*|один|одна|одну|одно[йгму]\w*|два|две|двух|три|тр[её]х|'
+    r'четыр[её]\w*|пят[ьи]\w*|шест[ьи]\w*|сем[ьи]\w*|восем\w*|девят\w*|десят\w*|'
+    r'двадцат\w*|тридцат\w*|сорок\w*|пятьдесят|сто|сотн\w*|несколько|пару)'
+    r'\s+(?:[\w-]+\s+){0,2}(?:процент\w*|пункт\w*|рубл\w*|доллар\w*|юан\w*|евро|'
+    r'тысяч\w*|миллион\w*|миллиард\w*|лет|год\w*|месяц\w*|дней|дня)\b|'
+    r'\bполпроцент\w*|\b(?:одно|двух|тр[её]х|пяти|десяти)процент\w*',re.I)
+def completed_assertion(text):
+    for match in COMPLETED.finditer(text):
+        if re.search(r'(?:может|могут)\s+быть\s*$',text[:match.start()],re.I):
+            continue
+        if re.match(r'(?:полученн|предоставленн)',match.group(),re.I) and re.match(
+            r'\s+(?:(?:банковск|локальн|исходн|учебн|синтетическ)\w*\s+)?(?:сценари|источник|материал|анализ|данн|прогноз)\w*\b',text[match.end():],re.I):
+            continue
+        return True
     return False
 
 
-def free_text_issues(text: str, *, conditional: bool = False) -> list[str]:
-    """A narrow refusal policy: no inferred figures or unqualified causal guarantees."""
-    codes = []
-    if BANK_ATTRIBUTION.search(text):
-        codes.append("UNSUPPORTED_BANK_ATTRIBUTION")
-    if ASSERTIVE.search(text):
-        codes.append("FALSE_CERTAINTY")
-    if re.search(r"\d", text):
-        codes.append("UNSUPPORTED_INFERENCE_NUMBER")
-    if UNSUPPORTED_COMPANY.search(text):
-        codes.append("UNSUPPORTED_COMPANY_CONDITION")
-    if conditional and not CONDITIONAL.search(text):
-        codes.append("CAUSAL_LINK_NOT_CONDITIONAL")
-    return codes
-
-
-def verify_draft(draft: DraftInsight, context: GroundedRunContext) -> VerificationReport:
-    issues: list[CheckIssue] = []
-    warnings = {"SEMANTIC_EXPERT_REVIEW_REQUIRED"}
-    def fail(code, claim_id=None):
-        issue = CheckIssue(code=code, claim_id=claim_id)
-        if issue not in issues:
-            issues.append(issue)
-
-    facts = {item.id: item for item in draft.facts}
-    impacts = {item.id: item for item in draft.impacts}
-    if len(facts) != len(draft.facts) or len(impacts) != len(draft.impacts) or set(facts) & set(impacts):
-        fail("DUPLICATE_CLAIM_ID")
-    if not any(item.source_id == context.event_source_id for item in draft.facts):
-        fail("MISSING_EVENT_ANCHOR")
-    event_date = utc(context.sources[context.event_source_id].published_at)
-    quantitative_facts = []
-    for fact in draft.facts:
-        source = context.sources.get(fact.source_id)
-        document = context.documents.get(fact.source_id)
-        if source is None or document is None:
-            fail("UNKNOWN_SOURCE", fact.id)
-            continue
-        visible = document.get(fact.field)
-        if not isinstance(visible, str) or not fact.quote.strip() or "[сокращено]" in fact.quote or fact.quote not in visible:
-            fail("QUOTE_NOT_VISIBLE", fact.id)
-        elif not complete_quote(fact.quote, visible, title=fact.field == "title"):
-            fail("QUOTE_CONTEXT_INCOMPLETE", fact.id)
-        if fact.kind == "bank_statement":
-            if not (source.is_bank_analytics and source.provenance_status == "verified" and source.source_document_id):
-                fail("BANK_SOURCE_NOT_VERIFIED", fact.id)
-            if fact.field != "content":
-                fail("BANK_STATEMENT_REQUIRES_CONTENT", fact.id)
-        elif source.is_bank_analytics:
-            warnings.add("BANK_MATERIAL_NOT_AN_OFFICIAL_POSITION")
-        if utc(source.published_at) > event_date:
-            fail("SOURCE_AFTER_ANALYSIS_DATE", fact.id)
-        if (event_date - utc(source.published_at)).days > 90:
-            warnings.add("HISTORICAL_SOURCE_CONTEXT")
-        if source.text_truncated:
-            warnings.add("SOURCE_TEXT_TRUNCATED")
-        quantitative = re.search(
-            r"\d+(?:[.,]\d+)?\s*(?:%|процент|руб|млн|млрд|RUB)|(?:ставк\w*|значени\w*)[^.!?]{0,45}\d", fact.quote, re.I,
-        )
-        if quantitative:
-            quantitative_facts.append(fact)
-        if quantitative and fact.value is None:
-            # An exact, attributed report may contain a number without enough
-            # scope to compute with it. Never certify its numeric interpretation.
-            warnings.add("NUMERIC_SCOPE_UNRESOLVED")
-        if fact.value is None and any((fact.metric, fact.entity, fact.period, fact.unit)):
-            fail("NUMERIC_SCOPE_REQUIRED", fact.id)
-        if fact.value is not None:
-            if not all((fact.metric, fact.entity, fact.unit, fact.period)):
-                fail("NUMERIC_SCOPE_REQUIRED", fact.id)
-            else:
-                tokens = re.findall(r"(?<![\w.])[+-]?\d+(?:[.,]\d+)?(?!\w)", fact.quote)
-                if Decimal(str(fact.value)) not in {Decimal(token.replace(",", ".")) for token in tokens}:
-                    fail("NUMBER_NOT_ANCHORED", fact.id)
-                if not all(part.casefold() in fact.quote.casefold() for part in (fact.metric, fact.entity, fact.period, fact.unit)):
-                    fail("NUMERIC_SCOPE_NOT_ANCHORED", fact.id)
-
-    if len(quantitative_facts) > 1 and any(fact.value is None for fact in quantitative_facts):
-        # Dropping every optional metadata field cannot silently disable the
-        # conflict check when synthesizing multiple quantitative source claims.
-        fail("UNNORMALIZED_NUMERIC_CLAIM")
-
-    known = context.business.known_features
-    if draft.applicability == "insufficient":
-        if draft.impacts or draft.actions:
-            fail("INSUFFICIENT_CONTEXT_HAS_CONCLUSIONS")
-        if not draft.missing_data:
-            fail("MISSING_CLARIFICATION")
-        visible_event = context.documents[context.event_source_id]
-        if event_qualitative_channels(known, visible_event):
-            # Missing contract data blocks quantification, not a conditional
-            # discussion of new financing / prospective investment decisions.
-            fail("QUALITATIVE_ANALYSIS_MISSING")
+def verify_draft(draft, context):
+    issues=[]
+    def fail(code,path,text='',claim=None):
+        issues.append(CheckIssue(code=code,claim_id=claim,path=path,excerpt=text[:160] or None))
+    def text_guard(text,path,*,premise=False,condition=False,financial=False,analytical_title=False):
+        if WRITTEN_QUANTITY.search(text) or re.search(r'\d|вдвое|втрое|удво|утро|на\s+(?:половину|треть|четверть)|\b(?:тысяч\w*|миллион\w*|миллиард\w*)\b',text,re.I):
+            fail('UNSUPPORTED_INFERENCE_NUMBER',path,text)
+        if CONFIDENT.search(text): fail('FALSE_CERTAINTY',path,text)
+        if BANK_POSITION.search(text): fail('UNSUPPORTED_BANK_ATTRIBUTION',path,text)
+        if premise and (completed_assertion(text) or ASSERTION.search(text)):
+            fail('UNSUPPORTED_FACTUAL_PREMISE',path,text)
+        if financial:
+            # The same financial guard applies to every published inference,
+            # including scenarios and action rationales. It is a bounded check,
+            # not proof that arbitrary prose follows semantically from a source.
+            if re.search(r'плавающ|фиксированн|остаток долга',text,re.I) and not (PREPARE.search(text) or analytical_title):
+                fail('UNSUPPORTED_COMPANY_CONDITION',path,text)
+            for match in PRODUCT_AS_LOAN.finditer(text):
+                if not re.search(r'\bне\s*$',text[:match.start('verb')],re.I):
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,match.group())
+            if re.search(r'сохран|без изменен|не измен',event,re.I):
+                for clause in re.split(r'[.!?;]',text):
+                    if (re.search(r'(?:плат[её]ж|процентн\w*\s+расход)[^.!?]{0,60}(?:выраст|увелич|сниз|сократ)',clause,re.I)
+                            and not re.search(r'не (?:означает|доказывает)|неизвест',clause,re.I)):
+                        fail('UNCHANGED_RATE_IMPLIES_PAYMENT_CHANGE',path,clause)
+        if condition and not CONDITION.search(text): fail('CONDITION_REQUIRED',path,text)
+        # An explicit conditional premise must not smuggle in a completed event
+        # after its boundary. Do not grant a whole paragraph immunity for 'if'.
+        if condition:
+            for clause in re.split(r'[,;.!?]',text)[1:]:
+                if completed_assertion(clause) or ASSERTION.search(clause):
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,clause)
+    def refs(ids,path):
+        for key in ids:
+            if key not in context.evidence: fail('UNKNOWN_EVIDENCE',path,key)
+        if 'news:event' not in ids: fail('MISSING_EVENT_ANCHOR',path)
+        if not any(context.evidence[key].kind in ('company','payment','calculation') for key in ids if key in context.evidence):
+            fail('MISSING_PERSONALIZATION',path)
+    if draft.applicability=='insufficient':
+        if draft.impacts or draft.scenarios or draft.actions: fail('INSUFFICIENT_HAS_CONCLUSIONS','applicability')
+        if not draft.missing_data: fail('MISSING_CLARIFICATION','missing_data')
     elif not draft.impacts or not draft.actions:
-        fail("INCOMPLETE_INTERPRETATION")
-    for impact in draft.impacts:
-        if not set(impact.fact_ids) <= set(facts):
-            fail("UNKNOWN_FACT_REFERENCE", impact.id)
-        if not set(impact.company_features) <= set(known):
-            fail("UNKNOWN_COMPANY_FEATURE", impact.id)
-        # Industry alone can support a conditional channel; a name or ID cannot.
-        if not impact.company_features:
-            fail("MISSING_PERSONALIZATION", impact.id)
-        for code in free_text_issues(impact.mechanism, conditional=True):
-            fail(code, impact.id)
-        # Contract terms may be explicit assumptions, not hidden factual clauses
-        # in a sentence that happens to contain a conditional word elsewhere.
-        if re.search(r"плавающ|фиксированн|остаток долга|floating|fixed.rate", impact.mechanism, re.I):
-            fail("UNSUPPORTED_COMPANY_CONDITION", impact.id)
-        event_quotes = " ".join(facts[key].quote for key in impact.fact_ids
-                                if key in facts and facts[key].source_id == context.event_source_id)
-        rule = CHANNEL_RULES.get(impact.channel)
-        if rule is None or not re.search(rule[0], event_quotes, re.I) or not re.search(rule[1], impact.mechanism, re.I):
-            fail("UNSUPPORTED_CAUSAL_CHANNEL", impact.id)
-        if (re.search(r"сохран|без изменен|не измен", event_quotes, re.I)
-                and re.search(r"(?:плат[её]ж|обслуживан.*долг)[^.!?]{0,50}(?:выраст|увелич|сниз|сократ)", impact.mechanism, re.I)):
-            fail("UNCHANGED_RATE_IMPLIES_PAYMENT_CHANGE", impact.id)
-        for text in [*impact.assumptions, *impact.data_needs]:
-            for code in free_text_issues(text):
-                fail(code, impact.id)
-        if impact.channel in ("financing", "investment") and not impact.data_needs:
-            fail("FINANCIAL_TERMS_UNKNOWN", impact.id)
-        if not any(facts[key].source_id == context.event_source_id for key in impact.fact_ids if key in facts):
-            fail("IMPACT_WITHOUT_EVENT", impact.id)
-    for action in draft.actions:
-        if not set(action.impact_ids) <= set(impacts):
-            fail("UNKNOWN_IMPACT_REFERENCE")
-        for text in [action.title, *action.required_data]:
-            for code in free_text_issues(text):
-                fail(code)
-    for text in [*draft.missing_data, *draft.clarification_questions]:
-        for code in free_text_issues(text):
-            fail(code)
+        fail('INCOMPLETE_INTERPRETATION','applicability')
+    if draft.context_request is not None:
+        fail('PENDING_CONTEXT_REQUEST','context_request')
+    if len({item.id for item in draft.impacts})!=len(draft.impacts): fail('DUPLICATE_IMPACT','impacts')
+    event=context.evidence['news:event'].quote
+    for n,item in enumerate(draft.impacts):
+        root=f'impacts[{n}]'
+        refs(item.evidence_ids,root+'.evidence_ids')
+        text_guard(item.condition,root+'.condition',condition=True)
+        text_guard(item.mechanism,root+'.mechanism',premise=True,financial=True)
+        if not MODAL.search(item.mechanism): fail('CAUSAL_LINK_NOT_CONDITIONAL',root+'.mechanism',item.mechanism)
+        if not supports_causal_channel(item.channel,event,item.condition,item.mechanism):
+            fail('UNSUPPORTED_CAUSAL_CHANNEL',root+'.channel',item.channel)
+        if not item.data_needs: fail('MISSING_DATA_NEEDS',root+'.data_needs')
+        for j,text in enumerate(item.data_needs): text_guard(text,f'{root}.data_needs[{j}]',premise=True)
+    for n,item in enumerate(draft.scenarios):
+        root=f'scenarios[{n}]';refs(item.evidence_ids,root+'.evidence_ids')
+        text_guard(item.label,root+'.label',premise=True)
+        text_guard(item.condition,root+'.condition',condition=True)
+        text_guard(item.outcome,root+'.outcome',premise=True,financial=True)
+        if not MODAL.search(item.outcome): fail('CAUSAL_LINK_NOT_CONDITIONAL',root+'.outcome',item.outcome)
+    known={item.id for item in draft.impacts}
+    for n,item in enumerate(draft.actions):
+        root=f'actions[{n}]'
+        if not set(item.impact_ids)<=known: fail('UNKNOWN_IMPACT_REFERENCE',root+'.impact_ids')
+        analytical_title=bool(PREPARE.search(item.title) or ANALYTIC_NOUN.search(item.title))
+        if not analytical_title or EXECUTE.search(item.title) or EXECUTIVE_NOUN.search(item.title):
+            fail('UNSUPPORTED_ACTION',root+'.title',item.title)
+        for field,text in [('title',item.title),('rationale',item.rationale)]:
+            text_guard(text,root+'.'+field,premise=True,financial=True,
+                       analytical_title=field=='title' and analytical_title)
+        for j,text in enumerate(item.required_data): text_guard(text,f'{root}.required_data[{j}]',premise=True)
+    compared=set(); groups=set()
+    for n,item in enumerate(draft.source_comparisons):
+        root=f'source_comparisons[{n}]'
+        keys=item.evidence_ids
+        group=frozenset(keys)
+        if len(group)!=len(keys): fail('DUPLICATE_COMPARISON_EVIDENCE',root+'.evidence_ids')
+        if group in groups: fail('DUPLICATE_SOURCE_COMPARISON',root+'.evidence_ids')
+        groups.add(group)
+        bank=[]
+        for key in keys:
+            entry=context.evidence.get(key)
+            if entry is None: fail('UNKNOWN_EVIDENCE',root+'.evidence_ids',key)
+            elif entry.kind!='bank': fail('NON_BANK_COMPARISON_EVIDENCE',root+'.evidence_ids',key)
+            else:
+                bank.append(entry)
+                compared.add(key)
+        if item.relationship=='different_vintages':
+            dates=[entry.published_at for entry in bank]
+            instants={value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+                      for value in dates if value is not None}
+            if len(bank)!=len(keys) or any(value is None for value in dates) or len(instants)<2:
+                fail('INVALID_COMPARISON_VINTAGES',root+'.relationship',item.relationship)
+        text_guard(item.explanation,root+'.explanation',premise=True,financial=True)
+    for n,text in enumerate(draft.missing_data): text_guard(text,f'missing_data[{n}]',premise=True)
+    selected={'news:event'}|{key for item in [*draft.impacts,*draft.scenarios,*draft.source_comparisons] for key in item.evidence_ids}
+    used_bank={key for key in selected if key in context.evidence and context.evidence[key].kind=='bank'}
+    if len(used_bank)>=2 and not used_bank<=compared:
+        fail('MISSING_SOURCE_COMPARISON','source_comparisons',', '.join(sorted(used_bank-compared)))
+    return VerificationReport(passed=not issues,issues=issues,
+        warnings=list(dict.fromkeys([*context.warnings,'SEMANTIC_EXPERT_REVIEW_REQUIRED',
+                                    *(['UNRESOLVED_SOURCE_COMPARISON'] if draft.source_comparisons else [])])),
+        checked_facts=len(selected & context.evidence.keys()),checked_impacts=len(draft.impacts))
 
-    conflicts = []
-    for first, second in combinations(draft.facts, 2):
-        key = (first.entity, first.metric, first.period, first.unit)
-        if (all(key) and key == (second.entity, second.metric, second.period, second.unit)
-                and first.value is not None and second.value is not None and first.value != second.value):
-            conflicts.append({first.id, second.id})
-    for pair in draft.acknowledged_conflicts:
-        if len(pair) != 2 or len(set(pair)) != 2 or set(pair) not in conflicts:
-            fail("INVALID_CONFLICT_REFERENCE")
-    for pair in conflicts:
-        if not any(set(ack) == pair for ack in draft.acknowledged_conflicts):
-            fail("UNACKNOWLEDGED_CONTRADICTION")
-    if conflicts:
-        warnings.add("CONTRADICTORY_SOURCES")
-        # Until a contradiction is resolved, claims cannot become causal premises.
-        conflicted = set().union(*conflicts)
-        if any(set(item.fact_ids) & conflicted for item in draft.impacts):
-            fail("CONTRADICTION_USED_AS_PREMISE")
-    if any(item["status"] == "error" for item in context.payload["observations"]):
-        warnings.add("INCOMPLETE_TOOL_DATA")
-    return VerificationReport(
-        passed=not issues, issues=issues, warnings=sorted(warnings),
-        checked_facts=len(draft.facts), checked_impacts=len(draft.impacts),
-    )
+
+def selected_evidence(draft,context):
+    ids=['news:event',*(key for item in [*draft.impacts,*draft.scenarios,*draft.source_comparisons] for key in item.evidence_ids),
+         *(key for key,value in context.evidence.items() if value.kind=='calculation')]
+    return [context.evidence[key] for key in dict.fromkeys(ids) if key in context.evidence]
 
 
-def project_insight(draft: DraftInsight, context: GroundedRunContext, report: VerificationReport) -> MLInsightResult:
-    """Only verified quotations are attributed to sources. Causal prose is labelled hypothesis."""
-    if not report.passed:
-        raise ValueError("Projection requires a passing verification report")
-    event_facts = [fact for fact in draft.facts if fact.source_id == context.event_source_id]
-    what = "\n".join(f"Источник сообщает: «{fact.quote}»" for fact in event_facts)
-    used_features = list(dict.fromkeys(key for impact in draft.impacts for key in impact.company_features))
-    why = "; ".join(
-        f"{FEATURE_LABELS.get(key, key)}: {'отмечен в профиле' if context.business.known_features[key] is True else str(context.business.known_features[key])}" for key in used_features
-    ) or "Связь события с компанией по доступным признакам не установлена."
-    if draft.impacts:
-        why += ". Связь с событием требует проверки: " + " ".join(item.mechanism for item in draft.impacts)
-    impact_text = []
-    for impact in draft.impacts:
-        impact_text.append(
-            f"Гипотеза AI ({ {'risk': 'риск', 'opportunity': 'возможность', 'mixed': 'риск и возможность'}[impact.direction]}; "
-            f"горизонт: { {'short': 'краткосрочный', 'medium': 'среднесрочный', 'long': 'долгосрочный', 'unknown': 'не определён'}[impact.horizon]}): {impact.mechanism}\n"
-            f"Допущения: {'; '.join(impact.assumptions)}\n"
-            f"Для проверки: {'; '.join(impact.data_needs) or 'Проверить применимость механизма к компании.'}"
-        )
-    bank_facts = [fact for fact in draft.facts if fact.kind == "bank_statement"]
-    bank_view = "\n".join(
-        f"Материал «{context.sources[fact.source_id].source_title}» от "
-        f"{context.sources[fact.source_id].published_at.date().isoformat()}: «{fact.quote}»"
-        for fact in bank_facts
-    ) or BANK_VIEW_UNAVAILABLE
-    if bank_facts and "HISTORICAL_SOURCE_CONTEXT" in report.warnings:
-        bank_view += "\nИсторический контекст; не подтверждает текущие условия или актуальность прогноза."
-    gaps = list(dict.fromkeys([*draft.missing_data, *(need for impact in draft.impacts for need in impact.data_needs)]))
-    ai_view = "Причинные выводы представлены как условные гипотезы AI, а не позиция банка."
-    if gaps:
-        ai_view += "\nНедостающие данные: " + "; ".join(gaps)
-    if draft.acknowledged_conflicts:
-        ai_view += "\nИсточники противоречат друг другу; спорные сведения не используются как установленная предпосылка."
-    ai_view += "\nОграничения: " + " ".join(context.business.limitations)
-    if report.warnings:
-        ai_view += "\nПрограммные проверки не доказывают истинность причинных связей; требуется экспертная оценка."
-    actions = "\n".join(
-        f"{item.owner_role + ': ' if item.owner_role else ''}{item.title}"
-        + (f" Нужны: {'; '.join(item.required_data)}" if item.required_data else "")
-        for item in draft.actions
-    ) or "Уточнить данные: " + "; ".join(draft.missing_data)
-    evidences = [EvidenceItem(
-        claim=fact.quote, source_title=context.sources[fact.source_id].source_title,
-        source_url=context.sources[fact.source_id].source_url,
-    ) for fact in draft.facts]
-    for key in used_features:
-        feature = f"{key}={json_text(context.business.known_features[key])}"
-        # Legacy DB column company_feature is only 255 chars; full feature remains in the companion DTO.
-        evidences.append(EvidenceItem(claim=f"Признак профиля: {key}", source_title="Профиль компании",
-                                      company_feature=feature if len(feature) <= 255 else None))
+def project_insight(draft,context,verification,calculations=()):
+    evidence=selected_evidence(draft,context)
+    labels={'mainokved_code':'ОКВЭД','mainokved_name':'Отрасль','region':'Регион','city':'Город',
+            'org_type':'Форма организации из профиля','okfs_name':'Форма собственности из профиля',
+            'company_age_years':'Возрастная категория из профиля','cl_type':'Класс клиента из профиля',
+            'amount_workers_fns':'Диапазон работников ФНС','amount_workers_spark':'Диапазон работников СПАРК',
+            'cl_product_loa_mark':'Признак кредитного продукта','cl_product_lea_mark':'Признак лизинга',
+            'revenue_company':'Выручка из профиля (год и валюта не заданы)'}
+    company=[]
+    for item in evidence:
+        if item.kind=='company':
+            data=json.loads(item.quote)
+            company.extend(labels.get(key,key)+': '+('отмечен в профиле' if value is True else str(value)) for key,value in data.items())
+        elif item.kind=='payment':
+            data=json.loads(item.quote)
+            if 'directions' in data:
+                company.append('Переданная платёжная выборка: входящие '+str(data['directions']['incoming']['total_amount'])+
+                    '; исходящие '+str(data['directions']['outgoing']['total_amount'])+'; период, валюта и полнота неизвестны.')
+            elif 'share_of_passed_direction_amount' in data:
+                share=data['share_of_passed_direction_amount']
+                direction={'incoming':'входящие платежи','outgoing':'исходящие платежи','unknown':'неустановленное направление'}.get(data['direction'],data['direction'])
+                company.append('Участник платёжной выборки '+str(data.get('name') or data['synthetic_u'])+
+                    ': '+direction+'; доля в переданной выборке направления '+(f'{share:.1%}' if share is not None else 'не определена')+'.')
+    why='; '.join(company)
+    if draft.impacts: why+='\n'+draft.impacts[0].condition+': '+draft.impacts[0].mechanism
+    else: why+='\nСвязь с деятельностью компании по доступным данным не установлена.'
+    channels={'financing':'финансирование','investment':'инвестиции','fx':'валютные расчёты','logistics':'логистика','inputs':'затраты','regulation':'регулирование','demand':'спрос','other':'прочие факторы'}
+    directions={'risk':'риск','opportunity':'возможность','mixed':'возможны разные последствия'}
+    impacts=[f'Условная гипотеза AI ({channels[item.channel]}, {directions[item.direction]}): {item.condition.rstrip(".")} — {item.mechanism}\nДля проверки: '+ '; '.join(item.data_needs) for item in draft.impacts]
+    scenarios=[f'{item.label}: {item.condition}. {item.outcome}' for item in draft.scenarios]
+    bank=[item for item in evidence if item.kind=='bank']
+    official=[item for item in bank if item.provenance_status=='verified' and item.source_document_id]
+    reported=[item for item in bank if item not in official]
+    bank_view='\n'.join(f'{item.source_title} ({item.published_at.date().isoformat()})'+
+        (' [частичная выдержка]' if item.text_truncated else '')+f': «{item.quote}»' for item in official) or BANK_VIEW_UNAVAILABLE
+    ai=['Условные механизмы AI требуют проверки; это не позиция банка.']
+    if scenarios: ai+=['Условные сценарии:\n'+'\n'.join(scenarios)]
+    relationships={'potential_conflict':'Возможное расхождение', 'different_vintages':'Разные даты публикации',
+                   'scope_requires_check':'Условия и целевые периоды требуют сверки'}
+    if draft.source_comparisons:
+        comparisons=[]
+        for item in draft.source_comparisons:
+            labels=[]
+            for key in item.evidence_ids:
+                entry=context.evidence[key]
+                stamp=entry.published_at.isoformat() if entry.published_at is not None else 'дата неизвестна'
+                labels.append(f'{entry.source_title} [{key}; {stamp}]')
+            comparisons.append(relationships[item.relationship]+': '+'; '.join(labels)+'. '+item.explanation)
+        ai+=['Неразрешённое сопоставление источников AI:\n'+'\n'.join(comparisons),
+             'Семантика сопоставления экспертно не проверена; проверка ID и дат не доказывает согласованность или противоречие.']
+    ai += [f'Локальный непроверенный банковский материал ({item.published_at.date().isoformat()})'+
+        (' [частичная выдержка]' if item.text_truncated else '')+f': «{item.quote}»' for item in reported]
+    if draft.missing_data: ai+=['Неизвестно / требуется уточнить: '+'; '.join(draft.missing_data)]
+    ai+=context.business.limitations
+    calculation_text=[item['description'] for item in calculations]
+    actions='\n'.join(f'{item.owner_role}: {item.title.rstrip(".")}. Зачем: {item.rationale.rstrip(".")}. Проверить: '+ '; '.join(item.required_data) for item in draft.actions)
     return MLInsightResult(
-        what_happened=what, why_important=why,
-        consequences="\n\n".join(impact_text) or "Данных для обоснованного вывода о последствиях недостаточно.",
-        bank_view=bank_view, ai_view=ai_view, recommended_action=actions + "\n" + DISCLAIMER,
-        relevant_bank_product=None, evidences=evidences,
-    )
+        what_happened='Источник сообщает: «'+context.evidence['news:event'].quote+'»',
+        why_important=why.strip(), consequences='\n\n'.join([*impacts,*calculation_text]) or 'Обоснованных последствий по имеющимся данным не установлено.',
+        bank_view=bank_view,ai_view='\n'.join(ai),
+        recommended_action=(actions or 'Уточнить: '+'; '.join(draft.missing_data))+'\n'+DISCLAIMER,
+        relevant_bank_product=None,
+        evidences=[EvidenceItem(claim=item.quote,source_title=item.source_title,source_url=item.source_url,
+                               company_feature=item.company_feature if item.company_feature and len(item.company_feature)<=255 else None) for item in evidence])

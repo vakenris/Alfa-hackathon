@@ -8,7 +8,8 @@ from unittest.mock import patch
 import httpx
 from pydantic import ValidationError
 
-from backend.app.agent import CompatibilityInsightEngine as AgentInsightEngine, FakeLLMClient, LLMClientProtocol, RecordingTracer
+from backend.app.agent import AgentInsightEngine, FakeLLMClient, LLMClientProtocol, RecordingTracer
+from backend.app.agent.tests.test_grounded import fixtures,valid_draft
 from backend.app.agent.api_client import (
     ChatCompletionsClient,
     LLMHTTPError,
@@ -344,29 +345,18 @@ class ChatCompletionsClientTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(client.last_usage)
 
     async def test_api_client_works_with_existing_engine_contract(self):
-        response_json = FakeLLMClient().response_json
+        response_json = json.dumps(valid_draft(),ensure_ascii=False)
         usage = {"prompt_tokens": 100, "completion_tokens": 50}
         client = self.make_client(
             lambda request: httpx.Response(200, json=completion(content=response_json, usage=usage))
         )
 
-        result = await AgentInsightEngine(client).generate_insight(
-            CompanyResponse(id=1, synthetic_u="TEST", name="Тестовая компания"),
-            NewsArticleResponse(
-                id=1,
-                title="Тестовая новость",
-                source="Тестовый источник",
-                published_at=datetime(2026, 10, 21, tzinfo=timezone.utc),
-                content="Тестовый текст новости.",
-                category="Тест",
-            ),
-            [],
-            RecordingTracer(),
-        )
-
-        expected = MLInsightResult.model_validate_json(response_json)
-        expected.bank_view = BANK_VIEW_UNAVAILABLE
-        self.assertEqual(result, expected)
+        company,event=fixtures()
+        result = await AgentInsightEngine(client).generate_insight(company,event,[],RecordingTracer())
+        self.assertIsInstance(result,MLInsightResult)
+        self.assertEqual(result.bank_view,BANK_VIEW_UNAVAILABLE)
+        self.assertEqual(result.evidences[0].claim,event.content)
+        self.assertIn(valid_draft()['impacts'][0]['mechanism'],result.consequences)
         self.assertEqual(client.last_usage, usage)
         self.assertNotIn("usage", result.model_dump())
         self.assertEqual(len(self.requests), 1)

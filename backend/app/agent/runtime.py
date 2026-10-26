@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.app.ml.interface import AgentTracerProtocol, MLInsightResult
 from backend.app.schemas.company import CompanyResponse, CounterpartyItem
 from backend.app.schemas.event import NewsArticleResponse
+from backend.app.llm.budget_guard import BudgetedChatCompletionsClient
 
 from .api_client import (
     ChatCompletionsClient, LLMHTTPError, LLMOutputLimitError, LLMResponseError, LLMTimeoutError,
@@ -76,7 +77,7 @@ class ValidationAttempt(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     call_number: int = Field(ge=1, strict=True)
-    phase: Literal["gather", "draft", "repair"]
+    phase: Literal["gather", "draft", "repair", "reanalysis"]
     issue_codes: list[str]
     facts: int = Field(ge=0, strict=True)
     impacts: int = Field(ge=0, strict=True)
@@ -283,9 +284,7 @@ class RuntimeAgentEngine:
         allow_test_dependencies: bool = False,
         approved_model_ids: Collection[str] | None = None,
     ):
-        selected_config = config if config is not None else AgentConfig(analysis_mode="grounded")
-        if getattr(selected_config, "analysis_mode", None) != "grounded":
-            raise ValueError("RuntimeAgentEngine requires grounded analysis mode.")
+        selected_config = config if config is not None else AgentConfig()
         if any(not callable(factory) or inspect.iscoroutinefunction(factory)
                for factory in (client_factory, source_factory)):
             raise ValueError("Runtime factories must synchronously return explicit dependencies.")
@@ -320,6 +319,8 @@ class RuntimeAgentEngine:
         if not self._allow_test_dependencies and isinstance(client, ChatCompletionsClient):
             if self._approved_model_ids is None or client.config.model not in self._approved_model_ids:
                 raise ValueError("Production ChatCompletionsClient requires an explicitly approved model identifier.")
+        if not self._allow_test_dependencies and not isinstance(client, BudgetedChatCompletionsClient):
+            raise ValueError("Production runtime requires the shared BudgetedChatCompletionsClient and team budget guard.")
         return AgentInsightEngine(client, analytics_source=source, config=self.config)
 
     async def generate_insight(
@@ -331,5 +332,9 @@ class RuntimeAgentEngine:
     async def generate_analysis(
         self, company: CompanyResponse, event: NewsArticleResponse,
         counterparties: list[CounterpartyItem], tracer: AgentTracerProtocol,
+        *, financial_inputs=None, loan_sensitivity=None,
     ):
-        return await self._new_engine().generate_analysis(company, event, counterparties, tracer)
+        return await self._new_engine().generate_analysis(
+            company, event, counterparties, tracer,
+            financial_inputs=financial_inputs, loan_sensitivity=loan_sensitivity,
+        )

@@ -3,7 +3,7 @@
 from .llm import FakeLLMClient, LLMClientProtocol
 from .config import AgentConfig
 from .models import AnalyticsDocument, AgentAnalysisResult
-from .orchestrator import AgentInsightEngine, CompatibilityInsightEngine
+from .orchestrator import AgentInsightEngine
 from .tools import AnalyticsSourceProtocol, MockAnalyticsSource
 from .tracer import RecordingTracer
 from .backend_source import BackendAnalyticsSource
@@ -14,7 +14,6 @@ from .action_models import ManagementActionRequest, ManagementActionResult
 __all__ = [
     "AgentInsightEngine", "FakeLLMClient", "LLMClientProtocol", "RecordingTracer",
     "AgentConfig", "AnalyticsDocument", "AnalyticsSourceProtocol", "MockAnalyticsSource",
-    "CompatibilityInsightEngine",
     "AgentAnalysisResult", "BackendAnalyticsSource", "RuntimeAgentEngine",
     "ManagementActionEngine", "ManagementActionRequest", "ManagementActionResult",
 ]

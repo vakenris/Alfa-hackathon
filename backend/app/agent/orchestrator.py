@@ -1,210 +1,204 @@
-"""A bounded tool loop implementing the existing backend engine contract."""
-
+"""Bounded Python agent: plan -> tools/context -> interpretation -> check/adapt."""
 import asyncio
 import json
-from typing import List
-
+from copy import deepcopy
 from pydantic import ValidationError
-
-from backend.app.ml.interface import AgentTracerProtocol, MLInsightResult
-from backend.app.schemas.company import CompanyResponse, CounterpartyItem
-from backend.app.schemas.event import NewsArticleResponse
-
 from .config import AgentConfig
-from .context import RunContext
-from .llm import FakeLLMClient, LLMClientProtocol
-from .models import (
-    ACTION_ADAPTER, BANK_VIEW_UNAVAILABLE, AgentContextError, AgentEvidenceError,
-    AgentLLMError, AgentLLMTimeoutError, AgentResponseError, AgentTimeoutError, FinalAction, ToolObservation,
-)
-from .prompts import build_finalization_prompt, build_planning_prompt
-from .tools import AnalyticsSourceProtocol, MockAnalyticsSource, execute_tool, validate_arguments
+from .context import prepare_context, merge_bank_context
+from .models import (AgentAnalysisResult,AgentConfigurationError,AgentContextError,AgentError,
+                     AgentEvidenceError,AgentLLMError,AgentLLMTimeoutError,AgentResponseError,AgentTimeoutError,CheckIssue,DraftInsight)
+from .prompts import build_prompt
+from .runtime import RunTelemetry,ObservedLLMClient,ValidationAttempt
+from .planning import build_plan,rank_news
+from .verification import verify_draft,project_insight,selected_evidence
 
 
-def reject_nonfinite(value: str):
-    raise ValueError("Non-finite numbers are not JSON")
+def decode_response(response,limit):
+    if not isinstance(response,str) or len(response)>limit: raise AgentResponseError('RESPONSE_SIZE_OR_TYPE')
+    def pairs(items):
+        result={}
+        for key,value in items:
+            if key in result: raise ValueError('Duplicate JSON key')
+            result[key]=value
+        return result
+    def nonfinite(_): raise ValueError('Nonfinite JSON')
+    try:
+        return DraftInsight.model_validate(json.loads(response,object_pairs_hook=pairs,parse_constant=nonfinite))
+    except json.JSONDecodeError:
+        raise AgentResponseError('MALFORMED_ANALYSIS_JSON') from None
+    except (ValueError,TypeError,RecursionError,ValidationError):
+        raise AgentResponseError('INVALID_ANALYSIS_JSON') from None
 
 
 class AgentInsightEngine:
-    def __init__(
-        self, llm_client: LLMClientProtocol | None = None, *,
-        analytics_source: AnalyticsSourceProtocol | None = None, config: AgentConfig | None = None,
-    ):
-        self.llm_client = llm_client if llm_client is not None else FakeLLMClient()
-        self.analytics_source = analytics_source if analytics_source is not None else MockAnalyticsSource()
-        self.config = config if config is not None else AgentConfig()
-        self._implicit_client = llm_client is None
-        self._llm_lock = asyncio.Lock()
+    def __init__(self,llm_client=None,*,analytics_source=None,config=None):
+        self.llm_client=llm_client
+        self.analytics_source=analytics_source
+        self.config=config or AgentConfig()
+        self._llm_lock=asyncio.Lock()
 
-    async def generate_insight(
-        self, company: CompanyResponse, event: NewsArticleResponse,
-        counterparties: List[CounterpartyItem], tracer: AgentTracerProtocol,
-    ) -> MLInsightResult:
-        if self.config.analysis_mode == "grounded":
-            return (await self.generate_analysis(company, event, counterparties, tracer)).insight
+    async def generate_insight(self,company,event,counterparties,tracer):
+        return (await self.generate_analysis(company,event,counterparties,tracer)).insight
+
+    @staticmethod
+    def rank_news(company,events,counterparties=(),*,limit=20):
+        return rank_news(company,events,counterparties,limit=limit)
+
+    async def generate_analysis(self,company,event,counterparties,tracer,*,financial_inputs=None,loan_sensitivity=None):
+        if self.llm_client is None: raise AgentConfigurationError('EXPLICIT_LLM_CLIENT_REQUIRED')
+        telemetry=RunTelemetry(max_calls=self.config.max_llm_calls)
+        plan={};observations=[];adaptations=[]
+        async def emit(name,description):
+            try:
+                async with asyncio.timeout(self.config.trace_timeout_seconds):
+                    await tracer.emit_step(name,description)
+            except Exception: raise AgentError('TRACE_UNAVAILABLE') from None
         try:
-            async with asyncio.timeout(self.config.run_timeout_seconds) as deadline:
-                return await self._run(company, event, counterparties, tracer)
+            async with asyncio.timeout(self.config.run_timeout_seconds) as run_deadline:
+                if len(counterparties)>self.config.max_input_counterparties:
+                    raise AgentContextError('COUNTERPARTY_INPUT_LIMIT')
+                company=company.model_copy(deep=True);event=event.model_copy(deep=True)
+                counterparties=[item.model_copy(deep=True) for item in counterparties]
+                financial_inputs=deepcopy(financial_inputs);loan_sensitivity=deepcopy(loan_sensitivity)
+                source=self.analytics_source
+                if getattr(source,'search_available',True) is False or self.config.max_bank_documents==0: source=None
+                plan=build_plan(company,event,counterparties,source,
+                    has_financial_inputs=financial_inputs is not None or loan_sensitivity is not None)
+                await emit('Планирование','Выбраны шаги: '+', '.join(step['tool'] for step in plan['steps']))
+                bank_step=next((step for step in plan['steps'] if step['tool']=='search_bank'),None)
+                # Reserve space for the shared plan and observations; never raise external limits.
+                context_config=self.config.model_copy(update={'max_context_chars':max(2000,self.config.max_context_chars-2000)})
+                context=await prepare_context(company.model_copy(deep=True),event.model_copy(deep=True),
+                    [item.model_copy(deep=True) for item in counterparties],source if bank_step else None,context_config,
+                    bank_query=bank_step['query'] if bank_step else None)
+                for step in plan['steps']:
+                    if step['tool']=='calculate_sensitivity': continue
+                    ids=[key for key,value in context.evidence.items() if value.kind=={'inspect_company':'company','summarize_payments':'payment','search_bank':'bank'}[step['tool']]]
+                    source_failed=step['tool']=='search_bank' and any(w in context.warnings for w in
+                        ('BANK_SOURCE_TIMEOUT','BANK_SOURCE_UNAVAILABLE_OR_INVALID','BANK_SOURCE_ID_CONFLICT','BANK_DOCUMENT_HASH_CONFLICT'))
+                    observations.append({'tool':step['tool'],'status':'error' if source_failed else 'ok' if ids else 'empty','evidence_ids':ids,
+                                         **({'query':step['query'],'warnings':context.warnings} if step['tool']=='search_bank' else {})})
+                    await emit('Инструмент',step['tool']+': '+observations[-1]['status'])
+                blocked_search_warnings={'BANK_SOURCE_TIMEOUT','BANK_SOURCE_UNAVAILABLE_OR_INVALID','BANK_SOURCE_ID_CONFLICT',
+                                         'BANK_DOCUMENT_HASH_CONFLICT','CONTEXT_OPTIONAL_EVIDENCE_OMITTED'}
+                if (bank_step and not any(item.kind=='bank' for item in context.evidence.values())
+                        and not blocked_search_warnings.intersection(context.warnings)
+                        and bank_step['query'].casefold().strip()!=bank_step['fallback_query'].casefold().strip()):
+                    await emit('Адаптация','Поиск не дал материалов; проверяется альтернативный тематический запрос.')
+                    previous_warnings=context.warnings
+                    context=await prepare_context(company,event,counterparties,source,context_config,bank_query=bank_step['fallback_query'])
+                    context.warnings=list(dict.fromkeys([*previous_warnings,*context.warnings]))
+                    context.payload['warnings']=context.warnings
+                    adaptations.append({'reason':'EMPTY_BANK_SEARCH','action':'alternative_query','query':bank_step['fallback_query']})
+                    source_failed=any(w in context.warnings for w in
+                        ('BANK_SOURCE_TIMEOUT','BANK_SOURCE_UNAVAILABLE_OR_INVALID','BANK_SOURCE_ID_CONFLICT','BANK_DOCUMENT_HASH_CONFLICT'))
+                    observations.append({'tool':'search_bank','status':'error' if source_failed else 'ok' if any(item.kind=='bank' for item in context.evidence.values()) else 'empty',
+                                         'query':bank_step['fallback_query'],'evidence_ids':[key for key,value in context.evidence.items() if value.kind=='bank'],
+                                         'warnings':context.warnings})
+                if context.warnings:
+                    adaptations.append({'reason':'SOURCE_LIMITATIONS','action':'qualitative_with_explicit_gaps','warnings':context.warnings})
+                from .financial import add_calculations
+                calculations=add_calculations(context,financial_inputs=financial_inputs,loan_sensitivity=loan_sensitivity)
+                if financial_inputs is not None or loan_sensitivity is not None:
+                    observations.append({'tool':'calculate_sensitivity','status':'ok' if calculations else 'needs_data',
+                                         'evidence_ids':[key for key,value in context.evidence.items() if value.kind=='calculation']})
+                context.payload['agent_context']={'plan':plan,'observations':observations,'adaptations':adaptations}
+                observed=ObservedLLMClient(self.llm_client,telemetry=telemetry)
+                draft=None;issues=None;phase='draft'
+                attempts=min(self.config.max_llm_calls,1+self.config.max_recovery_attempts)
+                for attempt in range(attempts):
+                    remaining_documents=self.config.max_bank_documents-sum(item.kind=='bank' for item in context.evidence.values())
+                    searches=sum(item['tool']=='search_bank' for item in observations)
+                    can_request=bool(source is not None and remaining_documents>0 and searches<2 and attempt+1<attempts
+                                     and not blocked_search_warnings.intersection(context.warnings))
+                    context.payload['agent_context'].update(can_request_bank_search=can_request,
+                        remaining_searches=max(0,2-searches),remaining_bank_documents=max(0,remaining_documents),
+                        remaining_llm_calls=attempts-attempt)
+                    prompt=build_prompt(context.payload,draft=draft,issues=issues,
+                                        max_context_chars=self.config.max_context_chars,
+                                        max_prompt_chars=self.config.max_prompt_chars)
+                    await emit('Анализ LLM','Интерпретация накопленного контекста.' if phase=='draft' else
+                        'Повторная интерпретация с дополненным контекстом.' if phase=='reanalysis' else 'Одно адресное исправление по точным нарушениям.')
+                    try:
+                        async with asyncio.timeout(self.config.llm_timeout_seconds) as call_deadline:
+                            async with self._llm_lock:
+                                response=await observed.generate(prompt)
+                    except TimeoutError:
+                        if call_deadline.expired(): telemetry.record_deadline('llm_deadline')
+                        raise AgentLLMTimeoutError('LLM_DEADLINE') from None
+                    except Exception: raise AgentLLMError('LLM_CALL_FAILED') from None
+                    try:
+                        draft=decode_response(response,self.config.max_response_chars)
+                    except AgentResponseError as error:
+                        if str(error)!='MALFORMED_ANALYSIS_JSON' or attempt+1>=attempts:
+                            raise
+                        issues=[CheckIssue(code='MALFORMED_ANALYSIS_JSON',path='response')]
+                        telemetry.validation_attempts.append(ValidationAttempt(call_number=attempt+1,phase=phase,
+                            issue_codes=['MALFORMED_ANALYSIS_JSON'],facts=0,impacts=0))
+                        adaptations.append({'reason':'INVALID_JSON_SYNTAX','action':'format_correction'})
+                        draft=None;phase='repair'
+                        await emit('Адаптация','Исправляется только формат JSON в оставшемся бюджете вызовов.')
+                        continue
+                    request=draft.context_request
+                    used_queries={item.get('query','').casefold().strip() for item in observations if item['tool']=='search_bank'}
+                    if request is not None and can_request and request.query.casefold().strip() not in used_queries:
+                        telemetry.validation_attempts.append(ValidationAttempt(call_number=attempt+1,phase=phase,
+                            issue_codes=['PENDING_CONTEXT_REQUEST'],facts=0,impacts=len(draft.impacts)))
+                        await emit('Адаптация','Интерпретация выявила пробел; выполняется один дополнительный банковский поиск.')
+                        plan['steps'].append({'tool':'search_bank','query':request.query,'reason':request.reason,'origin':'context_request'})
+                        additional_config=context_config.model_copy(update={'max_bank_documents':remaining_documents})
+                        additional=await prepare_context(company,event,counterparties,source,additional_config,bank_query=request.query)
+                        previous_ids=set(context.evidence)
+                        context=merge_bank_context(context,additional,context_config)
+                        ids=[key for key,value in context.evidence.items() if value.kind=='bank' and key not in previous_ids]
+                        failed=bool(blocked_search_warnings.intersection(additional.warnings))
+                        observations.append({'tool':'search_bank','query':request.query,'status':'error' if failed else 'ok' if ids else 'empty',
+                                             'evidence_ids':ids,'warnings':additional.warnings,'origin':'context_request'})
+                        adaptations.append({'reason':'MODEL_CONTEXT_REQUEST','action':'search_then_reanalyse','query':request.query,
+                                            'data_gap':request.reason,'evidence_ids':ids})
+                        context.payload['agent_context']={'plan':plan,'observations':observations,'adaptations':adaptations}
+                        draft=None;issues=None;phase='reanalysis'
+                        continue
+                    verification=verify_draft(draft,context)
+                    telemetry.validation_attempts.append(ValidationAttempt(call_number=attempt+1,phase=phase,
+                        issue_codes=[item.code for item in verification.issues],facts=verification.checked_facts,impacts=len(draft.impacts)))
+                    await emit('Самопроверка',f'Оснований: {verification.checked_facts}; нарушений: {len(verification.issues)}.')
+                    if verification.passed: break
+                    issues=verification.issues
+                    if attempt+1<attempts:
+                        adaptations.append({'reason':'VERIFICATION_FAILED','action':'targeted_correction','issues':[i.model_dump(exclude_none=True) for i in issues]})
+                        phase='repair'
+                        await emit('Адаптация','Уточняется только ответ с нарушениями; новые факты не разрешаются.')
+                if not verification.passed:
+                    error=AgentEvidenceError('ANALYSIS_VERIFICATION_FAILED')
+                    error.verification=verification.model_dump(mode='json')
+                    raise error
+                report=telemetry.build_report().model_dump(mode='json')
+                report.update(architecture='bounded_agent_v2',company_synthetic_u=company.synthetic_u,event_id=event.id,
+                              plan=plan,tool_observations=observations,adaptations=adaptations)
+                report['validation_summary']={'passed':True,'impacts':len(draft.impacts),'facts':verification.checked_facts,
+                                              'repairs':sum(item['action'] in ('targeted_correction','format_correction') for item in adaptations),
+                                              'reanalyses':sum(item['action']=='search_then_reanalyse' for item in adaptations),'tool_calls':len(observations)}
+                report['sources_summary']={'visible':len(context.sources),'verified_bank':sum(item.kind=='bank' and item.provenance_status=='verified' for item in context.evidence.values()),
+                                           'bank_article_content_hashes':context.bank_content_hashes}
+                used=selected_evidence(draft,context)
+                report['personalization_summary']={kind:sum(item.kind==kind for item in used) for kind in ('company','payment','bank','calculation')}
+                report['news_selection']=rank_news(company,[event],counterparties,limit=1)
+                report['quality_evaluated_by_expert']=False
+                return AgentAnalysisResult(company_id=company.id,event_id=event.id,
+                    insight=project_insight(draft,context,verification,calculations),analysis=draft,business_context=context.business,
+                    sources=context.sources,verification=verification,report=report,evidence=selected_evidence(draft,context),calculations=calculations)
         except TimeoutError:
-            if not deadline.expired():
-                raise
-            await tracer.emit_step("Ошибка времени", "Превышен общий timeout запуска агента.")
-            raise AgentTimeoutError("Превышен общий timeout запуска агента.") from None
-
-    async def generate_analysis(self, company, event, counterparties, tracer):
-        """Grounded companion result; never stores a report or sources on a shared engine."""
-        from .grounded import run_grounded
-        from .models import AgentConfigurationError, AgentError
-        from .runtime import RunTelemetry
-
-        if self.config.analysis_mode != "grounded" or self._implicit_client:
-            raise AgentConfigurationError("GROUNDED_REQUIRES_EXPLICIT_CLIENT")
-        telemetry = RunTelemetry(max_calls=min(self.config.max_steps, self.config.max_llm_calls))
-        try:
-            async with asyncio.timeout(self.config.run_timeout_seconds) as deadline:
-                return await run_grounded(self, company, event, counterparties, tracer, telemetry)
-        except TimeoutError:
-            if not deadline.expired():
-                raise
-            telemetry.record_deadline("run_deadline")
-            error = AgentTimeoutError("RUN_DEADLINE")
-            error.run_report = telemetry.build_report().model_dump(mode="json")
+            if not run_deadline.expired(): raise
+            telemetry.record_deadline('run_deadline')
+            error=AgentTimeoutError('RUN_DEADLINE')
+            error.run_report=telemetry.build_report().model_dump(mode='json')
+            error.run_report.update(architecture='bounded_agent_v2',company_synthetic_u=company.synthetic_u,event_id=event.id,
+                                    plan=plan,tool_observations=observations,adaptations=adaptations)
             raise error from None
-        except AgentError as error:
-            error.run_report = telemetry.build_report().model_dump(mode="json")
+        except (AgentError,asyncio.CancelledError) as error:
+            error.run_report=telemetry.build_report().model_dump(mode='json')
+            error.run_report.update(architecture='bounded_agent_v2',company_synthetic_u=company.synthetic_u,event_id=event.id,
+                                    plan=plan,tool_observations=observations,adaptations=adaptations)
+            if hasattr(error,'verification'): error.run_report['verification']=error.verification
             raise
-        except asyncio.CancelledError as error:
-            # Let the caller inspect safe usage even when it cancels a job.
-            error.run_report = telemetry.build_report().model_dump(mode="json")
-            raise
-
-    async def _run(
-        self, company: CompanyResponse, event: NewsArticleResponse,
-        counterparties: list[CounterpartyItem], tracer: AgentTracerProtocol,
-    ) -> MLInsightResult:
-        try:
-            context = RunContext(company, event, counterparties, self.config)
-        except AgentContextError:
-            await tracer.emit_step("Ошибка контекста", "Входные данные не помещаются в допустимый контекст.")
-            raise
-        await tracer.emit_step("Подготовка промпта", "Подготовлен ограниченный контекст компании и новости.")
-        if context.payload["limits"]["event_text_truncated"] or context.payload["limits"]["counterparties_omitted"]:
-            await tracer.emit_step("Ограничение контекста", "Часть входных данных сокращена; это отмечено в контексте.")
-
-        call_budget = min(self.config.max_steps, self.config.max_llm_calls)
-        tool_calls = 0
-        seen_requests: set[str] = set()
-        for call_index in range(call_budget):
-            final_only = (
-                call_index == call_budget - 1
-                or tool_calls >= self.config.max_tool_calls
-                or context.force_finalize
-            )
-            if final_only:
-                await tracer.emit_step("Финализация", "Дальнейшие инструменты недоступны; запрошен итоговый MLInsightResult.")
-                prompt = build_finalization_prompt(context)
-            else:
-                prompt = build_planning_prompt(
-                    context, steps_remaining=call_budget - call_index,
-                    tools_remaining=self.config.max_tool_calls - tool_calls,
-                )
-            await tracer.emit_step("Вызов клиента", f"Вызов LLM {call_index + 1}/{call_budget}.")
-            try:
-                async with asyncio.timeout(self.config.llm_timeout_seconds) as deadline:
-                    response = await self.llm_client.generate(prompt)
-            except TimeoutError:
-                if not deadline.expired():
-                    await tracer.emit_step("Ошибка LLM", "LLM-клиент завершился ошибкой; повторов нет.")
-                    raise AgentLLMError("LLM-клиент завершился ошибкой; повторов нет.") from None
-                await tracer.emit_step("Ошибка LLM", "Превышен timeout вызова LLM.")
-                raise AgentLLMTimeoutError("Превышен timeout вызова LLM.") from None
-            except Exception:
-                await tracer.emit_step("Ошибка LLM", "LLM-клиент завершился ошибкой; повторов нет.")
-                raise AgentLLMError("LLM-клиент завершился ошибкой; повторов нет.") from None
-
-            try:
-                if not isinstance(response, str) or len(response) > self.config.max_response_chars:
-                    raise AgentResponseError("Ответ LLM отсутствует или превышает лимит размера.")
-                payload = json.loads(response, parse_constant=reject_nonfinite)
-                if final_only:
-                    result = MLInsightResult.model_validate(payload)
-                else:
-                    # Preserve the original direct MLInsightResult response format too.
-                    if isinstance(payload, dict) and "action" not in payload:
-                        result = MLInsightResult.model_validate(payload)
-                    else:
-                        decision = ACTION_ADAPTER.validate_python(payload)
-                        result = decision.result if isinstance(decision, FinalAction) else None
-            except (ValidationError, ValueError, TypeError, RecursionError, AgentResponseError):
-                message = (
-                    "Финализация: LLM не вернул валидный MLInsightResult в пределах лимита размера."
-                    if final_only else "LLM вернул некорректный JSON действия или MLInsightResult."
-                )
-                await tracer.emit_step("Ошибка валидации", message)
-                raise AgentResponseError(message) from None
-
-            if result is not None:
-                try:
-                    bank_cited = context.validate_evidences(result)
-                    if not context.has_bank_materials:
-                        if result.bank_view != BANK_VIEW_UNAVAILABLE:
-                            await tracer.emit_step(
-                                "Ограничение источников", "Банковских материалов нет; bank_view заменён сообщением об отсутствии позиции банка.",
-                            )
-                        result.bank_view = BANK_VIEW_UNAVAILABLE
-                    elif result.bank_view != BANK_VIEW_UNAVAILABLE and not bank_cited:
-                        raise AgentEvidenceError("Для bank_view требуется evidence на полученный банковский материал.")
-                except AgentEvidenceError:
-                    await tracer.emit_step("Ошибка evidence", "Происхождение evidence или банковского материала не подтверждено контекстом.")
-                    raise
-                if result.relevant_bank_product is not None:
-                    await tracer.emit_step("Ограничение продуктов", "Каталог продуктов отсутствует; relevant_bank_product установлен в null.")
-                    result.relevant_bank_product = None
-                await tracer.emit_step(
-                    "Проверка формата", "MLInsightResult и происхождение evidence проверены; смысл утверждений не проверялся.",
-                )
-                return result
-
-            tool_calls += 1
-            try:
-                request_arguments = validate_arguments(decision).model_dump(mode="json")
-            except ValidationError:
-                request_arguments = decision.arguments
-            request_key = json.dumps(
-                [decision.tool, request_arguments], sort_keys=True, ensure_ascii=False,
-            )
-            await tracer.emit_step("Выбор инструмента", f"Запрошен {decision.tool}; запрос {tool_calls}/{self.config.max_tool_calls}.")
-            if request_key in seen_requests:
-                observation = ToolObservation(
-                    tool=decision.tool, arguments=decision.arguments, status="error", error="DUPLICATE_REQUEST",
-                )
-                context.force_finalize = True
-            else:
-                seen_requests.add(request_key)
-                observation = await execute_tool(
-                    decision, source=self.analytics_source, company=company, event=event,
-                    counterparties=context.counterparties, config=self.config,
-                )
-            try:
-                observation = context.add_observation(observation)
-            except AgentContextError:
-                await tracer.emit_step("Ошибка контекста", "Не удалось записать наблюдение в пределах лимита контекста.")
-                raise
-            if observation.status == "error":
-                await tracer.emit_step("Ошибка инструмента", f"{decision.tool}: {observation.error}.")
-            else:
-                await tracer.emit_step("Результат инструмента", f"Результат {decision.tool} добавлен в контекст.")
-
-        raise AgentResponseError("Лимит шагов исчерпан без итогового MLInsightResult.")
-
-
-class CompatibilityInsightEngine(AgentInsightEngine):
-    """Explicit old JSON/provenance behavior for regression fixtures and transport smoke only.
-
-    Not the grounded production path. The ordinary AgentInsightEngine defaults
-    to grounded validation; RuntimeAgentEngine rejects compatible mode.
-    """
-
-    def __init__(self, llm_client=None, *, analytics_source=None, config=None):
-        legacy_config = (config or AgentConfig()).model_copy(update={"analysis_mode": "compatible"})
-        super().__init__(llm_client, analytics_source=analytics_source, config=legacy_config)

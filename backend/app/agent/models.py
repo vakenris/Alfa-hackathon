@@ -1,110 +1,72 @@
-"""Internal control messages only. Public backend schemas remain unchanged."""
-
-from typing import Annotated, Any, Literal
+"""Small internal contract. Source facts are supplied by Python, not generated."""
 from datetime import datetime
-
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, StringConstraints
-
+from typing import Annotated, Any, Literal
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from backend.app.ml.interface import MLInsightResult
 from backend.app.schemas.event import NewsArticleResponse
 
-
-BANK_VIEW_UNAVAILABLE = "Позиция Альфа-Банка не предоставлена."
-DISCLAIMER = "Аналитика не является индивидуальной инвестиционной рекомендацией."
+BANK_VIEW_UNAVAILABLE = 'Позиция Альфа-Банка не предоставлена.'
+DISCLAIMER = 'Аналитика не является индивидуальной инвестиционной рекомендацией.'
 
 
 class AgentError(RuntimeError):
-    """Safe to expose through the worker's existing FAILED path."""
     run_report: dict[str, Any] | None = None
 
 
-class AgentConfigurationError(AgentError):
-    pass
-
-
-class AgentResponseError(AgentError):
-    pass
-
-
-class AgentEvidenceError(AgentError):
-    pass
-
-
-class AgentContextError(AgentError):
-    pass
-
-
-class AgentLLMError(AgentError):
-    pass
-
-
-class AgentLLMTimeoutError(AgentLLMError):
-    """The orchestrator's own per-call deadline expired, not an API failure."""
-
-
-class AgentTimeoutError(AgentError):
-    pass
+class AgentConfigurationError(AgentError): pass
+class AgentContextError(AgentError): pass
+class AgentResponseError(AgentError): pass
+class AgentEvidenceError(AgentError): pass
+class AgentLLMError(AgentError): pass
+class AgentLLMTimeoutError(AgentLLMError): pass
+class AgentTimeoutError(AgentError): pass
 
 
 class InternalModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+    model_config = ConfigDict(extra='forbid', hide_input_in_errors=True)
+
+
+Identifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r'^[A-Za-z0-9_:.-]+$')]
+ShortText = Annotated[str, Field(min_length=1, max_length=500, strict=True)]
+Channel = Literal['financing', 'investment', 'fx', 'logistics', 'inputs', 'regulation', 'demand', 'other']
 
 
 class AnalyticsDocument(InternalModel):
-    """Source metadata supplied by an adapter, never invented by the LLM."""
-
     article: NewsArticleResponse
     source_url: HttpUrl | None = None
-    provenance_status: Literal["unverified", "verified", "synthetic"] = "unverified"
+    provenance_status: Literal['unverified', 'verified', 'synthetic'] = 'unverified'
     source_document_id: str | None = Field(default=None, max_length=256)
     source_page: int | None = Field(default=None, ge=1, strict=True)
     source_hash: str | None = Field(default=None, max_length=128)
 
 
-class AnalyticsArguments(InternalModel):
-    query: str = Field(default="", max_length=256, strict=True)
-    limit: int = Field(default=3, ge=1, le=5, strict=True)
-
-
-class CounterpartyArguments(InternalModel):
-    pass
-
-
-class ToolAction(InternalModel):
-    action: Literal["tool"]
-    tool: Literal["get_bank_analytics", "summarize_counterparties"]
-    arguments: dict[str, Any]
-    purpose: str = Field(default="", max_length=240, strict=True)
-
-
-class FinalAction(InternalModel):
-    action: Literal["final"]
-    result: MLInsightResult
-
-
-ACTION_ADAPTER = TypeAdapter(Annotated[ToolAction | FinalAction, Field(discriminator="action")])
-
-
-class SourceRecord(InternalModel):
+class GroundedSource(InternalModel):
     source_id: str
     source_title: str
     source_url: str | None = None
+    published_at: datetime | None = None
     is_bank_analytics: bool = False
+    provenance_status: Literal['unverified', 'verified', 'synthetic'] = 'unverified'
+    source_document_id: str | None = None
+    source_page: int | None = None
+    source_hash: str | None = None
+    text_truncated: bool = False
 
 
-class ToolObservation(InternalModel):
-    tool: str
-    arguments: dict[str, Any]
-    status: Literal["ok", "error"]
-    data: dict[str, Any] | None = None
-    error: Literal[
-        "INVALID_ARGUMENTS", "TOOL_TIMEOUT", "TOOL_FAILED", "INVALID_TOOL_RESULT",
-        "DUPLICATE_REQUEST", "CONTEXT_LIMIT",
-    ] | None = None
-
-
-ShortText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=600, strict=True)]
-Identifier = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_:.-]+$")]
+class Evidence(InternalModel):
+    id: Identifier
+    source_id: str
+    source_title: str
+    quote: str
+    kind: Literal['news', 'company', 'payment', 'bank', 'calculation']
+    company_feature: str | None = None
+    source_url: str | None = None
+    published_at: datetime | None = None
+    provenance_status: Literal['unverified', 'verified', 'synthetic'] = 'unverified'
+    source_document_id: str | None = None
+    source_page: int | None = None
+    source_hash: str | None = None
+    text_truncated: bool = False
 
 
 class BusinessContext(InternalModel):
@@ -117,69 +79,62 @@ class BusinessContext(InternalModel):
     revenue_currency: str | None = None
 
 
-class GroundedSource(InternalModel):
-    source_id: str
-    source_title: str
-    source_url: str | None = None
-    published_at: datetime
-    is_bank_analytics: bool = False
-    provenance_status: Literal["unverified", "verified", "synthetic"] = "unverified"
-    source_document_id: str | None = None
-    source_page: int | None = None
-    source_hash: str | None = None
-    text_truncated: bool = False
-
-
-class AnchoredFact(InternalModel):
-    id: Identifier
-    source_id: Identifier
-    field: Literal["title", "content", "summary"] = "content"
-    quote: Annotated[str, Field(min_length=1, max_length=1000, strict=True)]
-    kind: Literal["reported_fact", "bank_statement"] = "reported_fact"
-    metric: str | None = Field(default=None, max_length=80)
-    entity: str | None = Field(default=None, max_length=128)
-    period: str | None = Field(default=None, max_length=80)
-    unit: str | None = Field(default=None, max_length=32)
-    value: float | None = Field(default=None, allow_inf_nan=False)
-
-
 class ImpactHypothesis(InternalModel):
     id: Identifier
-    channel: Literal["financing", "investment", "fx", "logistics", "inputs", "regulation", "demand", "other"]
-    direction: Literal["risk", "opportunity", "mixed"]
+    channel: Channel
+    direction: Literal['risk', 'opportunity', 'mixed'] = 'mixed'
+    condition: ShortText
     mechanism: ShortText
-    fact_ids: list[Identifier] = Field(min_length=1, max_length=8)
-    company_features: list[str] = Field(min_length=1, max_length=8)
-    assumptions: list[ShortText] = Field(min_length=1, max_length=5)
-    data_needs: list[ShortText] = Field(default_factory=list, max_length=8)
-    horizon: Literal["short", "medium", "long", "unknown"] = "unknown"
-    certainty: Literal["conditional"] = "conditional"
+    evidence_ids: list[Identifier] = Field(min_length=1, max_length=6)
+    data_needs: list[ShortText] = Field(default_factory=list, max_length=4)
+    horizon: Literal['short', 'medium', 'long', 'unknown'] = 'unknown'
+
+
+class Scenario(InternalModel):
+    label: Annotated[str, Field(min_length=1, max_length=100)]
+    condition: ShortText
+    outcome: ShortText
+    evidence_ids: list[Identifier] = Field(min_length=1, max_length=6)
 
 
 class ProposedAction(InternalModel):
     title: ShortText
-    impact_ids: list[Identifier] = Field(min_length=1, max_length=8)
-    required_data: list[ShortText] = Field(default_factory=list, max_length=8)
-    owner_role: Literal["CEO", "CFO", "TREASURY", "ACCOUNTANT", "ANALYST"] | None = None
+    rationale: ShortText
+    impact_ids: list[Identifier] = Field(min_length=1, max_length=4)
+    required_data: list[ShortText] = Field(default_factory=list, max_length=4)
+    owner_role: Literal['CEO', 'CFO', 'TREASURY', 'ACCOUNTANT', 'ANALYST'] = 'CFO'
+
+
+class ContextRequest(InternalModel):
+    """A bounded read-only request for Python to consider, never an LLM tool call."""
+    kind: Literal['bank_search'] = 'bank_search'
+    query: Annotated[str, Field(min_length=1, max_length=240, strict=True, pattern=r'\S')]
+    reason: ShortText
+
+
+class SourceComparison(InternalModel):
+    """Unresolved model interpretation; IDs/dates do not establish semantic truth."""
+    evidence_ids: list[Identifier] = Field(min_length=2, max_length=5)
+    relationship: Literal['potential_conflict', 'different_vintages', 'scope_requires_check']
+    status: Literal['unresolved'] = 'unresolved'
+    explanation: ShortText
 
 
 class DraftInsight(InternalModel):
-    action: Literal["draft"] = "draft"
-    applicability: Literal["conditional", "insufficient"]
-    facts: list[AnchoredFact] = Field(min_length=1, max_length=12)
-    impacts: list[ImpactHypothesis] = Field(default_factory=list, max_length=8)
-    actions: list[ProposedAction] = Field(default_factory=list, max_length=8)
-    missing_data: list[ShortText] = Field(default_factory=list, max_length=10)
-    clarification_questions: list[ShortText] = Field(default_factory=list, max_length=5)
-    acknowledged_conflicts: list[list[Identifier]] = Field(default_factory=list, max_length=8)
-
-
-GROUNDED_ACTION_ADAPTER = TypeAdapter(Annotated[ToolAction | DraftInsight, Field(discriminator="action")])
+    applicability: Literal['conditional', 'insufficient']
+    impacts: list[ImpactHypothesis] = Field(default_factory=list, max_length=4)
+    scenarios: list[Scenario] = Field(default_factory=list, max_length=3)
+    actions: list[ProposedAction] = Field(default_factory=list, max_length=4)
+    missing_data: list[ShortText] = Field(default_factory=list, max_length=6)
+    context_request: ContextRequest | None = None
+    source_comparisons: list[SourceComparison] = Field(default_factory=list, max_length=3)
 
 
 class CheckIssue(InternalModel):
     code: str
     claim_id: str | None = None
+    path: str | None = None
+    excerpt: str | None = None
 
 
 class VerificationReport(InternalModel):
@@ -199,3 +154,5 @@ class AgentAnalysisResult(InternalModel):
     sources: list[GroundedSource]
     verification: VerificationReport
     report: dict[str, Any]
+    evidence: list[Evidence] = Field(default_factory=list)
+    calculations: list[dict[str, Any]] = Field(default_factory=list)

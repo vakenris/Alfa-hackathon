@@ -9,12 +9,12 @@ the reset date nor a contractual delta may be inferred from a news/key-rate move
 """
 
 from decimal import Decimal
-from typing import Annotated, Literal
+from datetime import datetime
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .models import Identifier, InternalModel, ShortText
-from .runtime import RunReport
+from .models import Identifier, InternalModel, Scenario, ShortText
 
 
 Money = Annotated[Decimal, Field(ge=0, max_digits=24, decimal_places=6, allow_inf_nan=False)]
@@ -24,6 +24,12 @@ Currency = Literal["RUB", "USD", "EUR", "CNY"]
 class InputProvenance(InternalModel):
     data_mode: Literal["actual", "hypothetical"]
     reference: Annotated[str, Field(min_length=1, max_length=240, strict=True)]
+
+    @field_validator('reference')
+    @classmethod
+    def nonempty_reference(cls,value):
+        if not value.strip(): raise ValueError('A meaningful source reference is required')
+        return value
 
 
 class LoanSensitivityInput(InternalModel):
@@ -114,6 +120,11 @@ class ActionSourceRef(InternalModel):
     source_title: str
     source_url: str | None = None
     quote: str
+    published_at: datetime | None = None
+    source_document_id: str | None = None
+    source_page: int | None = None
+    source_hash: str | None = None
+    text_truncated: bool = False
     provenance_status: Literal["unverified", "verified", "synthetic"]
     attribution: Literal["reported_source", "verified_bank_statement"]
 
@@ -164,25 +175,15 @@ class ManagementActionResult(InternalModel):
     summary: str
     assumptions: list[str] = Field(default_factory=list)
     impacts: list[ActionImpact] = Field(default_factory=list)
+    scenarios: list[Scenario] = Field(default_factory=list)
     proposed_actions: list[ActionProposal] = Field(default_factory=list)
     missing_data: list[str] = Field(default_factory=list)
     clarification_questions: list[str] = Field(default_factory=list)
-    calculations: list[SensitivityCalculation] = Field(default_factory=list)
+    calculations: list[dict[str, Any]] = Field(default_factory=list)
     source_refs: list[ActionSourceRef] = Field(default_factory=list)
     company_features: list[KnownCompanyFeature] = Field(default_factory=list)
     provided_financial_inputs: FinancialInputs | None = None
+    provided_plan: list[PlanItem] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     disclaimer: str
-    report: RunReport
-
-
-class QuestionSelection(InternalModel):
-    """The LLM may select references and predefined gaps, never write an answer."""
-
-    fact_ids: list[Identifier] = Field(default_factory=list, max_length=12)
-    impact_ids: list[Identifier] = Field(default_factory=list, max_length=8)
-    company_features: list[Identifier] = Field(default_factory=list, max_length=12)
-    missing_data: list[Literal[
-        "loan_terms", "current_plan", "financial_inputs", "company_profile",
-        "source_details", "question_scope",
-    ]] = Field(default_factory=list, max_length=6)
+    report: dict[str, Any] = Field(default_factory=dict)
