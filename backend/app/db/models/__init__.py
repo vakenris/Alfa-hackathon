@@ -12,6 +12,7 @@ from backend.app.db.models.agent_trace import (
 from backend.app.db.models.audit import AuditLog
 from backend.app.db.models.bank_document import BankDocument, BankDocumentPage
 from backend.app.db.models.person_link import PersonCompanyLink, PersonLinkImport
+from backend.app.db.models.news_source import ExternalNewsSource
 
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "BankDocumentPage",
     "PersonCompanyLink",
     "PersonLinkImport",
+    "ExternalNewsSource",
 ]
