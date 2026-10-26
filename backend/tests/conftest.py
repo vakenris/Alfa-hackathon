@@ -21,6 +21,7 @@ os.environ["DATABASE_URL"] = (
 )
 os.environ["USE_IN_MEMORY_BUS"] = "true"
 os.environ["AUTO_SEED_DEMO"] = "false"
+os.environ["WORKER_MODE"] = "inline"
 
 
 from backend.app.main import app
@@ -112,24 +113,22 @@ async def prepare_database():
             session.add(insight)
             await session.flush()
 
-            session.add_all(
-                [
-                    AgentTraceStep(
-                        job_id=job.id,
-                        step_number=1,
-                        step_name="Анализ профиля",
-                        description="Профиль загружен",
+            session.add_all([
+                AgentTraceStep(
+                    job_id=job.id,
+                    step_number=1,
+                    step_name="Анализ профиля",
+                    description="Профиль загружен",
+                ),
+                Evidence(
+                    insight_id=insight.id,
+                    claim=(
+                        "Тестовая связь новости "
+                        "с кредитным профилем"
                     ),
-                    Evidence(
-                        insight_id=insight.id,
-                        claim=(
-                            "Тестовая связь новости "
-                            "с кредитным профилем"
-                        ),
-                        source_title=article.title,
-                    ),
-                ]
-            )
+                    source_title=article.title,
+                ),
+            ])
 
             await session.commit()
 

@@ -1,18 +1,24 @@
 import asyncio
-from datetime import datetime
+
+from sqlalchemy import func, select, update
+
 from backend.app.core.bus import get_event_bus
 from backend.app.core.logging import logger
+from backend.app.db.models.agent_trace import AgentTraceStep, JobRecord
 from backend.app.db.session import async_session_factory
 from backend.app.db.repositories.company_repo import CompanyRepository
 from backend.app.db.repositories.news_repo import NewsRepository
 from backend.app.db.repositories.job_repo import JobRepository
 from backend.app.db.repositories.insight_repo import InsightRepository
-from backend.app.worker.tracer import AgentTracer
+from backend.app.ml.interface import MockMLInsightEngine, MLInsightEngineProtocol
 from backend.app.schemas.company import CompanyResponse
 from backend.app.schemas.event import NewsArticleResponse
-from backend.app.ml.interface import MockMLInsightEngine, MLInsightEngineProtocol
 from backend.app.agent.companion import companion_store
 from backend.app.core.config import settings
+from backend.app.worker.config import worker_settings
+from backend.app.worker.events import close_bus, publish_event
+from backend.app.worker.queue import ClaimedJob, DatabaseJobQueue, utc_now
+from backend.app.worker.tracer import AgentTracer
 
 
 def create_default_ml_engine() -> MLInsightEngineProtocol:
@@ -75,95 +81,239 @@ def set_ml_engine(engine: MLInsightEngineProtocol):
     current_ml_engine = engine
 
 
-async def run_insight_pipeline(job_id: str, company_id: int, event_id: int):
-    """Orchestrates asynchronous insight generation in background worker."""
+async def run_insight_pipeline(
+    job_id: str,
+    company_id: int,
+    event_id: int,
+):
+    # The API has already committed PENDING.
+    # The external worker polls the database.
+    if worker_settings.mode == "database":
+        return
+
+    job = await DatabaseJobQueue(
+        async_session_factory
+    ).claim(job_id, company_id, event_id)
+
+    if job is not None:
+        await execute_job(job)
+
+
+async def _finish(
+    session,
+    job: ClaimedJob,
+    status: str,
+    error=None,
+):
+    result = await session.execute(
+        update(JobRecord)
+        .where(
+            JobRecord.id == job.id,
+            JobRecord.status == "PROCESSING",
+        )
+        .values(
+            status=status,
+            error_message=error,
+            updated_at=utc_now(),
+        )
+    )
+    await session.commit()
+
+    return result.rowcount == 1
+
+
+async def execute_job(job: ClaimedJob):
     bus = get_event_bus()
-    logger.info(f"Starting insight pipeline for Job {job_id} (Company: {company_id}, Event: {event_id})")
 
-    async with async_session_factory() as session:
-        job_repo = JobRepository(session)
-        company_repo = CompanyRepository(session)
-        news_repo = NewsRepository(session)
-        insight_repo = InsightRepository(session)
-        tracer = AgentTracer(job_id, job_repo)
+    try:
+        async with async_session_factory() as session:
+            insight_repo = InsightRepository(session)
 
-        try:
-            await job_repo.update_status(job_id, "PROCESSING")
-            await bus.publish(f"job:{job_id}", {
-                "event": "status",
-                "status": "PROCESSING",
-                "job_id": job_id
-            })
+            try:
+                await publish_event(bus, job.id, {
+                    "event": "status",
+                    "status": "PROCESSING",
+                    "job_id": job.id,
+                })
 
-            # 1. Fetch Company
-            company_model = await company_repo.get_by_id(company_id)
-            if not company_model:
-                raise ValueError(f"Company {company_id} not found")
-
-            # 2. Fetch Event
-            event_model = await news_repo.get_by_id(event_id)
-            if not event_model:
-                raise ValueError(f"News event {event_id} not found")
-
-            # 3. Fetch Counterparties
-            counterparties = await company_repo.get_top_counterparties(company_model.synthetic_u, limit=5)
-
-            # 4. Prepare Schemas for ML Engine
-            company_schema = CompanyResponse.model_validate(company_model)
-            event_schema = NewsArticleResponse.model_validate(event_model)
-
-            # 5. Call ML Agent via interface (supports companion analysis when available)
-            if hasattr(current_ml_engine, "generate_analysis"):
-                try:
-                    analysis_result = await current_ml_engine.generate_analysis(
-                        company=company_schema,
-                        event=event_schema,
-                        counterparties=counterparties,
-                        tracer=tracer
+                async with asyncio.timeout(
+                    worker_settings.timeout_seconds
+                ):
+                    saved = await insight_repo.get_by_job_id(
+                        job.id
                     )
-                    ml_result = analysis_result.insight
-                    companion_store.save(job_id, company_id, event_id, analysis_result)
-                except Exception as ex:
-                    logger.warning(f"generate_analysis failed, falling back to generate_insight: {ex}")
-                    ml_result = await current_ml_engine.generate_insight(
-                        company=company_schema,
-                        event=event_schema,
-                        counterparties=counterparties,
-                        tracer=tracer
+
+                    if saved is None:
+                        company_repo = CompanyRepository(session)
+
+                        company = await company_repo.get_by_id(
+                            job.company_id
+                        )
+                        event = await NewsRepository(
+                            session
+                        ).get_by_id(job.event_id)
+
+                        if company is None or event is None:
+                            raise ValueError(
+                                "Company or news event not found"
+                            )
+
+                        counterparties = (
+                            await company_repo.get_top_counterparties(
+                                company.synthetic_u,
+                                limit=5,
+                            )
+                        )
+
+                        company_schema = (
+                            CompanyResponse.model_validate(company)
+                        )
+                        event_schema = (
+                            NewsArticleResponse.model_validate(event)
+                        )
+
+                        tracer = AgentTracer(
+                            job.id,
+                            JobRepository(session),
+                            bus=bus,
+                        )
+
+                        tracer.current_step = (
+                            await session.scalar(
+                                select(
+                                    func.max(
+                                        AgentTraceStep.step_number
+                                    )
+                                ).where(
+                                    AgentTraceStep.job_id == job.id
+                                )
+                            )
+                        ) or 0
+
+                        await session.rollback()
+
+                        if hasattr(current_ml_engine, "generate_analysis"):
+                            try:
+                                analysis_result = (
+                                    await current_ml_engine.generate_analysis(
+                                        company=company_schema,
+                                        event=event_schema,
+                                        counterparties=counterparties,
+                                        tracer=tracer,
+                                    )
+                                )
+                                result = analysis_result.insight
+                                companion_store.save(
+                                    job.id,
+                                    job.company_id,
+                                    job.event_id,
+                                    analysis_result,
+                                )
+                            except Exception as ex:
+                                logger.warning(
+                                    f"generate_analysis failed, falling back to generate_insight: {ex}"
+                                )
+                                result = (
+                                    await current_ml_engine.generate_insight(
+                                        company=company_schema,
+                                        event=event_schema,
+                                        counterparties=counterparties,
+                                        tracer=tracer,
+                                    )
+                                )
+                        else:
+                            result = (
+                                await current_ml_engine.generate_insight(
+                                    company=company_schema,
+                                    event=event_schema,
+                                    counterparties=counterparties,
+                                    tracer=tracer,
+                                )
+                            )
+
+                        saved = await insight_repo.save_insight(
+                            job_id=job.id,
+                            company_id=job.company_id,
+                            event_id=job.event_id,
+                            ml_result=result,
+                        )
+                        companion_store.link_insight(saved.id, job.id)
+
+                    insight_id = saved.id
+
+                    completed = await _finish(
+                        session,
+                        job,
+                        "SUCCESS",
                     )
-            else:
-                ml_result = await current_ml_engine.generate_insight(
-                    company=company_schema,
-                    event=event_schema,
-                    counterparties=counterparties,
-                    tracer=tracer
+
+                if completed:
+                    await publish_event(bus, job.id, {
+                        "event": "completed",
+                        "status": "SUCCESS",
+                        "job_id": job.id,
+                        "insight_id": insight_id,
+                    })
+
+            except asyncio.CancelledError:
+                await session.rollback()
+
+                saved = await insight_repo.get_by_job_id(
+                    job.id
                 )
 
-            # 6. Save Insight & Evidence to DB
-            saved_insight = await insight_repo.save_insight(
-                job_id=job_id,
-                company_id=company_id,
-                event_id=event_id,
-                ml_result=ml_result
-            )
-            companion_store.link_insight(saved_insight.id, job_id)
+                await _finish(
+                    session,
+                    job,
+                    "SUCCESS" if saved is not None else "FAILED",
+                    (
+                        None
+                        if saved is not None
+                        else "Worker stopped during analysis"
+                    ),
+                )
+                raise
 
-            # 7. Mark Job as SUCCESS
-            await job_repo.update_status(job_id, "SUCCESS")
-            await bus.publish(f"job:{job_id}", {
-                "event": "completed",
-                "status": "SUCCESS",
-                "job_id": job_id,
-                "insight_id": saved_insight.id
-            })
-            logger.info(f"Job {job_id} finished successfully with insight {saved_insight.id}")
+            except Exception as error:
+                logger.exception("Job %s failed", job.id)
+                await session.rollback()
 
-        except Exception as e:
-            logger.exception(f"Job {job_id} failed: {str(e)}")
-            await job_repo.update_status(job_id, "FAILED", error_message=str(e))
-            await bus.publish(f"job:{job_id}", {
-                "event": "failed",
-                "status": "FAILED",
-                "job_id": job_id,
-                "error": str(e)
-            })
+                # Preserve a result committed before a later failure.
+                saved = await insight_repo.get_by_job_id(
+                    job.id
+                )
+
+                if saved is not None:
+                    await _finish(
+                        session,
+                        job,
+                        "SUCCESS",
+                    )
+                    await publish_event(bus, job.id, {
+                        "event": "completed",
+                        "status": "SUCCESS",
+                        "job_id": job.id,
+                        "insight_id": saved.id,
+                    })
+                else:
+                    message = (
+                        "Analysis timeout"
+                        if isinstance(error, TimeoutError)
+                        else str(error)[:500]
+                    )
+
+                    await _finish(
+                        session,
+                        job,
+                        "FAILED",
+                        message,
+                    )
+                    await publish_event(bus, job.id, {
+                        "event": "failed",
+                        "status": "FAILED",
+                        "job_id": job.id,
+                        "error": message,
+                    })
+
+    finally:
+        await close_bus(bus)
