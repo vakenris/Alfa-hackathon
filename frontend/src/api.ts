@@ -22,3 +22,25 @@ export interface HistoryItem { insight_id: number; event_id: number; what_happen
 export interface Job { status: string; insight_id: number | null; error_message: string | null; trace_steps: {step_number: number; step_name: string; description: string}[] }
 export interface Summary { total_insights: number; insights_last_7_days: number; revenue_rub: number | null; active_products: Record<string, boolean>; fts_countries: string | null }
 export interface Exposure { total_outgoing_rub: number; total_incoming_rub: number; net_flow_rub: number }
+export interface QuestionAnswerResponse {
+  insight_id: number;
+  question: string;
+  answer: string;
+  relevant_source: string | null;
+}
+export async function askQuestion(insightId: number, question: string, role: string): Promise<QuestionAnswerResponse> {
+  return request<QuestionAnswerResponse>("/questions", role, {
+    method: "POST",
+    body: JSON.stringify({ insight_id: insightId, question }),
+  });
+}
+export interface BudgetMetrics {
+  daily_budget_rub: number;
+  spent_budget_rub: number;
+  remaining_budget_rub: number;
+  total_tokens_used: number;
+  budget_exhausted: boolean;
+}
+export async function getBudgetMetrics(role: string = "Финансовый директор"): Promise<BudgetMetrics> {
+  return request<BudgetMetrics>("/metrics/budget", role);
+}

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Badge, IconBubble, Modal, Panel } from "../components/ui";
 import { Icon } from "../components/Icon";
+import { InsightQA } from "../components/InsightQA";
 import type { AutomaticAnalysis } from "../hooks/useAutomaticInsights";
 import type { LiveNews } from "../api";
-export function NewsPage({item, automatic}: {item:LiveNews; automatic:AutomaticAnalysis}) {
+export function NewsPage({item, automatic, role = "Финансовый директор"}: {item:LiveNews; automatic:AutomaticAnalysis; role?: string}) {
   const insight = automatic.insights.find(result => result.event_id === Number(item.id));
   const job = automatic.jobs.find(result => result.event_id === Number(item.id));
   const failed = job?.status === "FAILED";
@@ -41,7 +42,7 @@ export function NewsPage({item, automatic}: {item:LiveNews; automatic:AutomaticA
           </section>
         </div>
         <div className="article-footer-grid">
-
+          {insight && <InsightQA insightId={insight.id} role={role} />}
           <section className="event-analysis-link"><span className="event-analysis-icon"><Icon name="chart" size={24}/></span><div><h2>Общая картина для компании</h2><p>Все события, рекомендации и банковские решения — в одном разделе.</p><a className="event-analysis-button" href={`#/analysis?source=${item.id}`}>К сводному анализу <Icon name="arrow" size={17}/></a></div></section>
         </div>
       </Panel>

@@ -213,3 +213,92 @@
     transition: none;
   }
 }
+
+/* Budget Guardian Widget (Slide 12, Criterion 08) */
+.budget-mini-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  margin-top: auto;
+  margin-bottom: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.budget-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+.budget-mini-text {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.budget-guardian-widget {
+  margin-top: auto;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.budget-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.budget-shield-icon {
+  font-size: 18px;
+}
+.budget-title-block {
+  display: flex;
+  flex-direction: column;
+}
+.budget-widget-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+.budget-widget-sub {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.budget-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.budget-progress-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.budget-progress-bar.ok {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+.budget-progress-bar.warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+.budget-progress-bar.critical {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+.budget-widget-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #cbd5e1;
+}
+.budget-tokens {
+  color: #94a3b8;
+}

@@ -1,5 +1,6 @@
 import { Icon } from "./Icon";
 import { useLocalStorage } from "../hooks/useLocalStorage";
+import { BudgetGuardianWidget } from "./BudgetGuardianWidget";
 import type { IconName } from "./Icon";
 export type Page = "home" | "analysis" | "account";
 const links: { page: Page; href: string; label: string; icon: IconName }[] = [
@@ -33,6 +34,7 @@ export function Sidebar({ page }: { page: Page }) {
           </a>
         ))}
       </nav>
+      <BudgetGuardianWidget expanded={expanded} />
       <button
         type="button"
         className="sidebar-toggle"

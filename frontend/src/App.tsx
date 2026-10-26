@@ -128,7 +128,7 @@ function App() {
             sourceId={analysisSource}
           />
         ) : feedLoading ? <p role="status">Загрузка новостей…</p> : item ? (
-          <NewsPage key={`${selected.id}:${item.id}:${role}`} item={item} automatic={automatic} />
+          <NewsPage key={`${selected.id}:${item.id}:${role}`} item={item} automatic={automatic} role={role} />
         ) : path === "/" ? (
           <HomePage automatic={automatic} key={`${selected.id}:${role}`} companies={companies.map(c => c.name)} news={news} role={role} setRole={setRole} company={company} setCompany={setCompany} />
         ) : (
