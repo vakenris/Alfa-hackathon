@@ -55,6 +55,78 @@ PAYMENT_CONCLUSION = re.compile(
     r'(?P<verb>доказыва\w*|подтвержда\w*)[^.!?;]{0,65}'
     r'(?:дефицит\w*|кассов\w*\s+разрыв\w*|неплат[её]ж\w*|зависимост\w*)', re.I)
 
+FINANCIAL_MARKER = re.compile(r'плавающ\w*|фиксированн\w*|остаток\s+долга', re.I)
+# These frames describe missing evidence, not absence of debt. Their scope is
+# local to a marker; a following statement never inherits a paragraph exemption.
+SCOPE_BOUNDARY = re.compile(r'[.!?;:\n]|\b(?:но|однако|зато)\b|,\s*(?:а|и)\b', re.I)
+NEGATIVE_EVIDENCE = re.compile(
+    r'\bне\s+(?:подтвержда\w*|доказыва\w*|означа\w*|определя\w*|устанавлива\w*)\b', re.I)
+UNKNOWN_EVIDENCE = re.compile(
+    r'\b(?:неизвест\w*|не\s+(?:извест\w*|установлен\w*|подтвержд[её]н\w*)|'
+    r'(?:нет|отсутствуют)\s+(?:данных|сведений|информации))\b', re.I)
+FINANCIAL_PREDICATE = re.compile(
+    r'\b(?:есть|имеется|имеются|составля\w*|равен|равна|равно|равны|действует|действуют|'
+    r'применяется|применяются|обслужива\w*|погаша\w*|влия\w*|завис\w*|может|могут|будет|будут)\b', re.I)
+
+
+def issue_excerpt(text, span=None):
+    """Keep the offending match visible even in a long mechanism; bounded UI text."""
+    if span is None or len(text)<=160:
+        return text[:160] or None
+    start,end=span
+    window=max(0,min(start-48,len(text)-160))
+    if end>window+160:
+        window=max(0,end-160)
+    return text[window:window+160]
+
+
+def financial_marker_is_unknown(text, match):
+    """Bounded grammatical heuristic, not a proof of a financial relationship.
+
+    Explicit facts, quantities and source attribution are checked independently.
+    In particular, a product disclaimer cannot legitimize a later asserted debt.
+    """
+    boundaries=list(SCOPE_BOUNDARY.finditer(text,0,match.start()))
+    start=boundaries[-1].end() if boundaries else 0
+    following=SCOPE_BOUNDARY.search(text,match.end())
+    end=following.start() if following else len(text)
+    prefix=text[start:match.start()]
+    suffix=text[match.end():end]
+    # A question stops at any comma: unlike a list of disclaimer objects, its
+    # following clause may make a new factual assertion.
+    if re.search(r'\b(?:есть|имеется|имеются)\s+ли\b[^,]*$',prefix,re.I):
+        return True
+    # Unknown/negative evidence may enumerate objects across commas. An
+    # independent coordinated predicate terminates that list even without a
+    # comma ("не подтверждает долг и остаток долга влияет на расходы").
+    request=PREPARE.search(prefix.lstrip()) or ANALYTIC_NOUN.search(prefix.lstrip())
+    frame=list(NEGATIVE_EVIDENCE.finditer(prefix))+list(UNKNOWN_EVIDENCE.finditer(prefix))
+    if request:
+        # Preserve offsets if the local clause starts with whitespace.
+        offset=len(prefix)-len(prefix.lstrip())
+        tail=prefix[offset+request.end():]
+    else:
+        tail=None
+    if frame:
+        last=max(frame,key=lambda item:item.start())
+        tail=prefix[last.end():]
+    if tail is not None:
+        coordinated=re.search(r'\bи\s+(?!ли\b)',tail,re.I)
+        # A relative clause after the list ("которые могут ...") does not
+        # establish a financial condition that the list explicitly calls unknown.
+        new_predicate=coordinated and FINANCIAL_PREDICATE.search(
+            tail[coordinated.end():]+match.group()+suffix.split(',',1)[0])
+        # A predicate attached to a new subject after a comma is another
+        # assertion, not a comma-separated object of "не подтверждает".
+        comma_predicate=',' in tail and FINANCIAL_PREDICATE.search(suffix.split(',',1)[0])
+        if not new_predicate and not comma_predicate:
+            return True
+    # "Остаток долга неизвестен" is locally unasserted; unknownness elsewhere
+    # in the sentence does not suppress an assertion about this marker.
+    if re.match(r'\s+(?:ставк\w*\s+)?(?:компании\s+)?(?:неизвест\w*|не\s+(?:извест\w*|установлен\w*|подтвержд[её]н\w*))\b',suffix,re.I):
+        return True
+    return False
+
 
 def unsupported_hold_baseline(text, event, assumption=''):
     """Catch specific invented comparisons; not a semantic economic verifier."""
@@ -70,45 +142,54 @@ def unsupported_hold_baseline(text, event, assumption=''):
                  for match in HOLD_INCREASE.finditer(text))
     return bool(increase or (
         EXPECTATION_COMPARISON.search(text) and not hypothetical_expectation))
-def completed_assertion(text):
+def completed_assertion_match(text):
     for match in COMPLETED.finditer(text):
         if re.search(r'(?:может|могут)\s+быть\s*$',text[:match.start()],re.I):
             continue
         if re.match(r'(?:полученн|предоставленн)',match.group(),re.I) and re.match(
             r'\s+(?:(?:банковск|локальн|исходн|учебн|синтетическ)\w*\s+)?(?:сценари|источник|материал|анализ|данн|прогноз)\w*\b',text[match.end():],re.I):
             continue
-        return True
-    return False
+        return match
+    return None
+
+
+def completed_assertion(text):
+    return completed_assertion_match(text) is not None
 
 
 def verify_draft(draft, context):
+    """Check references separately from bounded prose heuristics.
+
+    JSON shape/types/lengths are enforced by decode_response and DraftInsight.
+    Evidence membership and provenance stay in the Python-owned registry;
+    grammar/relevance guards below cannot prove economic causality. A passing
+    result therefore keeps SEMANTIC_EXPERT_REVIEW_REQUIRED.
+    """
     issues=[]
-    def fail(code,path,text='',claim=None):
-        issues.append(CheckIssue(code=code,claim_id=claim,path=path,excerpt=text[:160] or None))
-    def text_guard(text,path,*,premise=False,condition=False,financial=False,analytical_title=False,assumption=''):
-        if WRITTEN_QUANTITY.search(text) or re.search(r'\d|вдвое|втрое|удво|утро|на\s+(?:половину|треть|четверть)|\b(?:тысяч\w*|миллион\w*|миллиард\w*)\b',text,re.I):
-            fail('UNSUPPORTED_INFERENCE_NUMBER',path,text)
-        if CONFIDENT.search(text): fail('FALSE_CERTAINTY',path,text)
-        if BANK_POSITION.search(text): fail('UNSUPPORTED_BANK_ATTRIBUTION',path,text)
-        if premise and (completed_assertion(text) or ASSERTION.search(text)):
-            fail('UNSUPPORTED_FACTUAL_PREMISE',path,text)
+    def fail(code,path,text='',claim=None,span=None):
+        issues.append(CheckIssue(code=code,claim_id=claim,path=path,excerpt=issue_excerpt(text,span)))
+    def text_guard(text,path,*,premise=False,condition=False,financial=False,assumption=''):
+        quantity=WRITTEN_QUANTITY.search(text) or re.search(r'\d|вдвое|втрое|удво|утро|на\s+(?:половину|треть|четверть)|\b(?:тысяч\w*|миллион\w*|миллиард\w*)\b',text,re.I)
+        if quantity:
+            fail('UNSUPPORTED_INFERENCE_NUMBER',path,text,span=quantity.span())
+        if match:=CONFIDENT.search(text): fail('FALSE_CERTAINTY',path,text,span=match.span())
+        if match:=BANK_POSITION.search(text): fail('UNSUPPORTED_BANK_ATTRIBUTION',path,text,span=match.span())
+        if premise and (match:=completed_assertion_match(text) or ASSERTION.search(text)):
+            fail('UNSUPPORTED_FACTUAL_PREMISE',path,text,span=match.span())
         if financial:
             # The same financial guard applies to every published inference,
             # including scenarios and action rationales. It is a bounded check,
             # not proof that arbitrary prose follows semantically from a source.
-            markers=list(re.finditer(r'плавающ|фиксированн|остаток долга',text,re.I))
-            # "есть ли ... с плавающей ставкой" requests an unknown condition;
-            # its scope ends at a comma or sentence boundary, never the whole paragraph.
-            unknown_type=any(not re.search(r'\b(?:есть|имеется|имеются)\s+ли\b[^,;.!?]*$',
-                                          text[:match.start()],re.I) for match in markers)
-            if unknown_type and not (PREPARE.search(text) or analytical_title):
-                fail('UNSUPPORTED_COMPANY_CONDITION',path,text)
+            marker=next((item for item in FINANCIAL_MARKER.finditer(text)
+                         if not financial_marker_is_unknown(text,item)),None)
+            if marker is not None:
+                fail('UNSUPPORTED_COMPANY_CONDITION',path,text,span=marker.span())
             for match in PRODUCT_AS_LOAN.finditer(text):
                 if not re.search(r'\bне\s*$',text[:match.start('verb')],re.I):
-                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,match.group())
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,text,span=match.span())
             for match in PAYMENT_CONCLUSION.finditer(text):
                 if not re.search(r'\bне\s*$',text[:match.start('verb')],re.I):
-                    fail('UNSUPPORTED_PAYMENT_CONCLUSION',path,match.group())
+                    fail('UNSUPPORTED_PAYMENT_CONCLUSION',path,text,span=match.span())
             if unsupported_hold_baseline(text,event,assumption):
                 fail('UNSUPPORTED_COMPARISON_BASELINE',path,text)
             if re.search(r'сохран|без изменен|не измен',event,re.I):
@@ -123,8 +204,9 @@ def verify_draft(draft, context):
             for boundary in re.finditer(r'([,;.!?])([^,;.!?]*)',text):
                 clause=boundary.group(2)
                 coordinated=boundary.group(1)==',' and CONDITION_CONTINUATION.search(clause)
-                if completed_assertion(clause) or (ASSERTION.search(clause) and not coordinated):
-                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,clause)
+                match=completed_assertion_match(clause) or (ASSERTION.search(clause) if not coordinated else None)
+                if match:
+                    fail('UNSUPPORTED_FACTUAL_PREMISE',path,clause,span=match.span())
     def refs(ids,path):
         for key in ids:
             if key not in context.evidence: fail('UNKNOWN_EVIDENCE',path,key)
@@ -161,11 +243,11 @@ def verify_draft(draft, context):
         root=f'actions[{n}]'
         if not set(item.impact_ids)<=known: fail('UNKNOWN_IMPACT_REFERENCE',root+'.impact_ids')
         analytical_title=bool(PREPARE.search(item.title) or ANALYTIC_NOUN.search(item.title))
-        if not analytical_title or EXECUTE.search(item.title) or EXECUTIVE_NOUN.search(item.title):
-            fail('UNSUPPORTED_ACTION',root+'.title',item.title)
+        unsafe_action=EXECUTE.search(item.title) or EXECUTIVE_NOUN.search(item.title)
+        if not analytical_title or unsafe_action:
+            fail('UNSUPPORTED_ACTION',root+'.title',item.title,span=unsafe_action.span() if unsafe_action else None)
         for field,text in [('title',item.title),('rationale',item.rationale)]:
-            text_guard(text,root+'.'+field,premise=True,financial=True,
-                       analytical_title=field=='title' and analytical_title)
+            text_guard(text,root+'.'+field,premise=True,financial=True)
         for j,text in enumerate(item.required_data): text_guard(text,f'{root}.required_data[{j}]',premise=True)
     compared=set(); groups=set()
     for n,item in enumerate(draft.source_comparisons):

@@ -9,13 +9,16 @@ RULES = '''Подготовь бизнес-анализ CEO/CFO: один JSON �
 их показывает Python. Новость может быть непроверенной/синтетической.
 Отрасли достаточно для условного анализа; неизвестный долг блокирует расчёт, не гипотезы.
 Посторонняя новость: insufficient, пустые impacts/scenarios/actions, объясни пробел.
-Каждый impact и scenario: известный признак → применимость канала → условное последствие.
-Объясни роль использованного признака, а не просто добавь ссылку. Не выдумывай особенности
-региона, клиентов и проектов. evidence_ids каждого impact И scenario включают news:event
-и использованный факт компании/платёжной выборки/расчёта. Банковская ссылка их не заменяет.
+Каждый impact и scenario: факт компании → экономический канал новости → условное последствие.
+Отрасль должна объяснять бизнес-механизм: например, стоимость финансирования возможного
+обновления оборудования, если оно планируется; не приписывай компании проект или клиентов.
+Используй только существенные признаки, не все доступные. evidence_ids каждого impact И
+scenario включают news:event и использованный факт компании/платежей/расчёта; банк их не заменяет.
 condition — 'Если ...' с неизвестными предпосылками; составные условия пиши 'и если ...'.
 mechanism/outcome — объяснение с 'может/могут', без утверждений о действиях компании.
-Для mechanism ориентир 300–600 символов; если объяснение уже ясно, короче допустимо.
+mechanism — суть причинной цепочки, ориентир 300–600 символов, короче допустимо.
+Неизвестную предпосылку объясни один раз в condition, нужные данные — в data_needs/missing_data.
+Не заменяй объяснение отраслевого канала повторением 'профиль не подтверждает долг/проект'.
 Разделяй событие, существовавшие условия, их сохранение и будущую условную развилку.
 Сохранение ставки не является повышением, новым удорожанием или ухудшением относительно
 предыдущего периода. Не утверждай изменение расходов без базы сравнения и договорных данных.
@@ -26,17 +29,17 @@ mechanism/outcome — объяснение с 'может/могут', без у
 focus_channels — приоритеты, не закрытый список. Неизвестные условия компании/клиентов — гипотезы.
 Флаг продукта не доказывает получение кредита, долг, тип ставки или договор.
 Возраст и штат — исходные категории; диапазоны ФНС/СПАРК не усредняй.
-Платежи — только переданная выборка: не выручка, не поставки, не вся деятельность; собственные
-переводы исключены из внешних направлений. largest_group — сумма крупнейших участников
-и её доля от ВСЕЙ переданной выборки данного направления, не от показанных участников.
-Концентрация не доказывает кассовый дефицит или зависимость бизнеса. Если канал релевантен,
-предложи сверить назначения/сроки расчётов; регулярность обязательств неизвестна.
+Платежи — выборка, не выручка, не поставки, не вся деятельность; собственные переводы исключены.
+largest_group: сумма крупнейших и доля от ВСЕЙ переданной выборки направления, не показанных.
+Концентрация может задать приоритет сверки календаря расчётов, но не доказывает дефицит,
+зависимость бизнеса или регулярность обязательств. Не придумывай связь новости с платежами.
 Банковский материал используй содержательно: свяжи его условный прогноз и горизонт
 с решением компании, если это уместно. Дата публикации — не целевой период, прогноз — не факт
 реализации; не усредняй прогнозы. Точные периоды Python сохранит в цитате источника.
 Не приписывай банку выводы AI. Позиция банка — точная выдержка verified с документом;
 unverified — непроверенное сообщение источника. Если качественного источника нет, скажи об этом.
-text_truncated=true — частичная выдержка; не суди о содержании остального документа.
+Метаданные evidence находятся в source_metadata по source_id; quote сохранены дословно.
+text_truncated=true — частичная выдержка; не суди об остальном документе.
 source_comparisons сравнивает ТОЛЬКО банковские evidence, минимум два; при одном оставь [].
 Новость с прогнозом сопоставляй в условном сценарии, не в source_comparisons.
 При нескольких использованных банковских evidence покрой все их ID. Сверяй условия и
@@ -48,29 +51,34 @@ context_request: kind=bank_search, query — короткая тема, reason �
 коррекцию: всего не более двух LLM-вызовов; окончательный context_request=null.
 Без разрешения укажи missing_data. Отсутствие позиции банка не отменяет качественный анализ.
 Обычно достаточно одного-двух разных механизмов; максимум три условных сценария.
-Actions — подготовка решения: owner_role, что проверить, основание из impact, какие данные
-нужны и КАКОЙ ВЫБОР позволит сделать проверка. Нескольких конкретных действий достаточно.
+Actions — подготовка управленческого выбора: owner_role, основание из impact, что сопоставить,
+какие данные нужны и какое решение позволит принять проверка. Для условного проекта это могут
+быть очередность этапов и варианты финансирования, без утверждения о наличии проекта.
+Не создавай отдельное действие только для повторения missing_data. Нескольких действий достаточно.
 Название: 'Проверить/Сверить/Сопоставить/Запросить ...' либо 'Проверка/Сверка/Запрос ...'.
 Не предполагай договор в названии, не предлагай исполнить сделку, взять кредит, закрыть
 производство или уволить людей. Грамматика не доказывает безопасность действия.
-Не повторяй общие оговорки в mechanism; не гарантируй исход и не выдавай гипотезу за факт.'''
+Общие ограничения Python покажет отдельно: не повторяй их в каждом mechanism/rationale.
+Не гарантируй исход и не выдавай гипотезу за факт; отсутствие подтверждения не означает отсутствия.'''
 
 
 SOURCE_FIELDS = ('source_title', 'source_url', 'published_at', 'provenance_status',
                  'source_document_id', 'source_page', 'source_hash', 'text_truncated')
 
 
-def recovery_context(payload):
-    """Lossless evidence packing; omit duplicated profile and execution history.
+def packed_context(payload, *, recovery=False):
+    """Group repeated source metadata without dropping evidence or tool permissions.
 
-    Every quote and source attribute is retained. A full previous draft is sent
-    once because the existing response contract requires a complete replacement,
-    not patches. Neither the original registry nor the draft is mutated.
+    Initial interpretation keeps the company profile and all tool observations.
+    Recovery omits the duplicate profile and execution history; the registry and
+    previous draft remain unchanged. Every quote and source attribute is retained.
     """
     result={key:value for key,value in payload.items()
             if key not in ('company', 'agent_context', 'evidence', 'payment_scope')}
-    result['company']={key:value for key,value in payload.get('company',{}).items() if key!='known_features'}
-    result['agent_context']={'can_request_bank_search':False, 'remaining_llm_calls':1}
+    result['company']={key:value for key,value in payload.get('company',{}).items()
+                       if not recovery or key!='known_features'}
+    result['agent_context']=({'can_request_bank_search':False, 'remaining_llm_calls':1}
+                             if recovery else dict(payload.get('agent_context',{})))
     # The payment scope is normally already an explicit business limitation.
     limitations=payload.get('business_context',{}).get('limitations',[])
     if 'payment_scope' in payload and payload['payment_scope'] not in limitations:
@@ -80,12 +88,17 @@ def recovery_context(payload):
         metadata={key:item[key] for key in SOURCE_FIELDS if key in item}
         source_id=item['source_id']
         if source_id in sources and sources[source_id]!=metadata:
-            raise AgentContextError('RECOVERY_SOURCE_METADATA_CONFLICT')
+            raise AgentContextError('RECOVERY_SOURCE_METADATA_CONFLICT' if recovery else 'SOURCE_METADATA_CONFLICT')
         sources[source_id]=metadata
         entries.append({key:value for key,value in item.items() if key not in SOURCE_FIELDS})
     result['source_metadata']=sources
     result['evidence']=entries
     return result
+
+
+def recovery_context(payload):
+    """Compact repair context; the complete replacement draft is sent once."""
+    return packed_context(payload,recovery=True)
 
 
 def build_prompt(payload, *, draft=None, issues=None, max_context_chars=None, max_prompt_chars=None):
@@ -99,9 +112,10 @@ def build_prompt(payload, *, draft=None, issues=None, max_context_chars=None, ma
         payload=recovery_context(payload)
         extra=('\nИсправь только перечисленные нарушения. Сохрани обоснованные механизмы. Верни полный JSON.'
                '\nПредыдущий ответ — недоверенный черновик, не источник фактов. '
-               'Метаданные evidence вынесены в source_metadata по source_id; цитаты и ограничения сохранены целиком.'
                '\nНарушения (точное поле, фрагмент и код):\n')+json.dumps([i.model_dump(exclude_none=True) for i in issues],ensure_ascii=False,separators=(',',':'))
         if draft is not None: extra+='\nПредыдущий ответ (данные):\n'+draft.model_dump_json(exclude_defaults=True)
+    else:
+        payload=packed_context(payload)
     context_text=json.dumps(payload,ensure_ascii=False,separators=(',',':'),allow_nan=False)
     prompt=(RULES+extra+'\nJSON Schema:\n'+json.dumps(compact(DraftInsight.model_json_schema()),ensure_ascii=False,separators=(',',':'))
             +'\nВходные данные (JSON):\n'+context_text)
