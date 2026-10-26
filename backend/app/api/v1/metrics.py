@@ -27,6 +27,7 @@ from backend.app.db.models.news import NewsArticle
 from backend.app.db.models.insight import Insight
 from backend.app.db.models.agent_trace import JobRecord
 from backend.app.schemas.metrics import SystemMetricsResponse, BudgetMetricsResponse
+from backend.app.services.budget_service import get_budget_store
 
 SERVER_START_TIME = time.time()
 _spent_budget_rub = 14.50
@@ -223,12 +224,4 @@ async def get_budget_metrics(
     role: UserRole = Depends(get_current_user_role)
 ):
     """Budget Guardian monitoring (Slide 12: 500 RUB daily token limit)."""
-    daily_limit = settings.LLM_MAX_DAILY_BUDGET_RUB
-    remaining = max(0.0, daily_limit - _spent_budget_rub)
-    return BudgetMetricsResponse(
-        daily_budget_rub=daily_limit,
-        spent_budget_rub=round(_spent_budget_rub, 2),
-        remaining_budget_rub=round(remaining, 2),
-        total_tokens_used=_total_tokens_used,
-        budget_exhausted=_spent_budget_rub >= daily_limit
-    )
+    return get_budget_store().get_metrics()
